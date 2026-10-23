@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { TabType } from './Sidebar';
 import { AuthUser } from '@/lib/auth';
+import type { Quote } from '@/lib/types';
+import { useConnectionStatus } from '@/lib/connection-status';
+import { NotificationsMenu, ConnectionBadge } from '@/components/header/NotificationsMenu';
 
 interface HeaderProps {
   searchQuery: string;
@@ -12,6 +15,8 @@ interface HeaderProps {
   currentUser?: AuthUser | null;
   onLogout?: () => void;
   onOpenChangePassword?: () => void;
+  quotes: Quote[];
+  onOpenQuote: (quoteId: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,8 +27,10 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onLogout,
   onOpenChangePassword,
+  quotes,
+  onOpenQuote,
 }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
+  const connection = useConnectionStatus();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const userName = currentUser?.name || 'Washington Assis';
@@ -79,43 +86,14 @@ export const Header: React.FC<HeaderProps> = ({
           <span>Criar Orçamento</span>
         </button>
 
-        {/* Notifications */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            aria-label="Notificações"
-            className="relative w-10 h-10 rounded-xl bg-[#eff4ff] flex items-center justify-center text-[#49607e] hover:bg-[#e5eeff] hover:text-[#0b1c30] transition-colors"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#ba1a1a] ring-2 ring-white"></span>
-          </button>
-
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-[#e5eeff] p-4 z-50">
-              <div className="flex items-center justify-between pb-2 border-b border-[#eff4ff]">
-                <span className="font-bold text-sm text-[#0b1c30]">Notificações Comerciais</span>
-                <span className="text-[10px] font-semibold bg-[#ffdad6] text-[#ba1a1a] px-2 py-0.5 rounded-full">3 Urgentes</span>
-              </div>
-              <div className="flex flex-col gap-2.5 pt-3">
-                <div className="p-2.5 rounded-xl bg-[#eff4ff] text-xs flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#004328]">Sistema Conectado ao Supabase</span>
-                    <span className="text-[10px] text-emerald-700 font-bold">Ativo</span>
-                  </div>
-                  <span className="text-[#49607e]">Banco de dados em tempo real operacional</span>
-                </div>
-                <div className="p-2.5 rounded-xl bg-[#eff4ff] text-xs flex flex-col gap-1">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-[#004328]">Novo sequencial pronto</span>
-                    <span className="text-[10px] text-[#49607e]">Agora</span>
-                  </div>
-                  <span className="text-[#49607e]">Sequencial #319 pronto para emissão com IA de NRs</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Status da conexão + notificações calculadas dos orçamentos */}
+        <ConnectionBadge connection={connection} />
+        <NotificationsMenu
+          userId={currentUser?.id || 'anon'}
+          quotes={quotes}
+          connection={connection}
+          onOpenQuote={onOpenQuote}
+        />
 
         {/* User profile */}
         <div className="relative">

@@ -1,13 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { BrandLogo } from './ui/BrandLogo';
 import { Quote } from '@/lib/types';
 import { getStoredCompanyProfile, CompanyProfile } from '@/lib/company';
 import { getStoredLogoUrl } from '@/lib/logo';
 import { 
   getStoredResponsibles, 
   addStoredResponsible, 
-  removeStoredResponsible 
+  removeStoredResponsible,
+  sanitizeResponsibles,
+  isAllowedResponsible,
+  PRIMARY_RESPONSIBLE
 } from '@/lib/responsibles';
 
 interface ServiceOrderModalProps {
@@ -25,12 +29,12 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
 }) => {
   const [responsibles, setResponsibles] = useState<string[]>(() => {
     const list = responsiblePersons.length > 0 ? responsiblePersons : getStoredResponsibles();
-    return list.filter(n => n !== 'Carlos Eduardo');
+    return sanitizeResponsibles(list);
   });
 
   const [responsibleName, setResponsibleName] = useState<string>(() => {
-    const defaultResp = quote?.responsibleTech || responsibles[0] || 'Washington Assis';
-    return defaultResp === 'Carlos Eduardo' ? 'Washington Assis' : defaultResp;
+    const defaultResp = quote?.responsibleTech || responsibles[0] || PRIMARY_RESPONSIBLE;
+    return isAllowedResponsible(defaultResp) ? defaultResp : PRIMARY_RESPONSIBLE;
   });
 
   const [executionDeadline, setExecutionDeadline] = useState<string>(() =>
@@ -46,12 +50,21 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   const [isManagingResponsibles, setIsManagingResponsibles] = useState(false);
   const [newResponsibleInput, setNewResponsibleInput] = useState('');
 
-  // Sincronização e classes de controle de impressão
+  // Recarrega perfil da empresa e logo sempre que o modal é aberto
+  // (ajuste de estado durante o render, padrão recomendado pelo React em vez de setState em efeito)
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setCompanyProfile(getStoredCompanyProfile());
+      setLogoUrl(getStoredLogoUrl());
+    }
+  }
+
+  // Classes de controle de impressão
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('os-modal-open');
-      setCompanyProfile(getStoredCompanyProfile());
-      setLogoUrl(getStoredLogoUrl());
     } else {
       document.body.classList.remove('os-modal-open');
     }
@@ -90,8 +103,7 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
     const handleRespUpdate = (e: Event) => {
       const custom = e as CustomEvent<string[]>;
       if (custom.detail && Array.isArray(custom.detail)) {
-        const filtered = custom.detail.filter(n => n !== 'Carlos Eduardo');
-        setResponsibles(filtered);
+        setResponsibles(sanitizeResponsibles(custom.detail));
       }
     };
     window.addEventListener('consentra_responsibles_updated', handleRespUpdate);
@@ -327,14 +339,11 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
           {/* Header Consentra */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b-2 border-[#004328] print:pb-1.5 print:gap-2">
             <div className="flex items-center gap-3">
-              <img
-                src={logoUrl || '/logo-consentra-horizontal.png'}
+              <BrandLogo
+                src={logoUrl}
                 alt="Consentra Gestão de SST"
                 className="h-12 sm:h-14 w-auto max-w-[210px] object-contain print:h-10 print:max-h-10"
                 style={{ objectFit: 'contain', width: 'auto', maxHeight: '48px' }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo-consentra-horizontal.png';
-                }}
               />
               <div>
                 <h1 className="text-lg font-black tracking-tight text-[#004328] print:text-[13pt] print:leading-none">

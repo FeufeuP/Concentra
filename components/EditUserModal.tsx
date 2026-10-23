@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { AuthUser, updateUser } from '@/lib/auth';
+import React, { useState } from 'react';
+import { AuthUser, UserRole, USER_ROLES, updateUser, adminResetPassword, isAdminUser, getCurrentUser, MIN_PASSWORD_LENGTH } from '@/lib/auth';
 
 interface EditUserModalProps {
   isOpen: boolean;
@@ -23,7 +23,9 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
 }) => {
   const [name, setName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
-  const [role, setRole] = useState<'Administrador' | 'Responsável Técnico' | 'Responsável Técnico e Administrador' | 'Comercial' | 'Auditor SST'>(user.role || 'Responsável Técnico');
+  const [role, setRole] = useState<UserRole>(user.role || 'Responsável Técnico');
+  // Só administradores alteram e-mail, perfil e senha de terceiros
+  const [canManage] = useState<boolean>(() => isAdminUser(getCurrentUser()));
   const [documentRegistration, setDocumentRegistration] = useState(user.documentRegistration || '');
   const [phone, setPhone] = useState(user.phone || '');
   const [newPassword, setNewPassword] = useState('');
@@ -33,7 +35,7 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
   const [saveProgress, setSaveProgress] = useState<number>(0);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -45,52 +47,51 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
       setErrorMsg('Informe um e-mail corporativo válido.');
       return;
     }
-    if (newPassword && newPassword.length < 3) {
-      setErrorMsg('A nova senha deve ter pelo menos 3 dígitos.');
+    if (newPassword && newPassword.trim().length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`A nova senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
 
     setIsSaving(true);
-    setSaveProgress(20);
+    setSaveProgress(30);
 
-    setTimeout(() => {
-      setSaveProgress(50);
-    }, 120);
+    const payload: Partial<AuthUser> = {
+      name: name.trim(),
+      documentRegistration: documentRegistration.trim(),
+      phone: phone.trim(),
+    };
+    if (canManage) {
+      payload.email = email.trim().toLowerCase();
+      payload.role = role;
+    }
 
-    setTimeout(() => {
-      setSaveProgress(85);
-    }, 280);
+    const res = await updateUser(user.id, payload);
+    if (!res.success || !res.user) {
+      setIsSaving(false);
+      setSaveProgress(0);
+      setErrorMsg(res.error || 'Erro ao atualizar dados do usuário.');
+      return;
+    }
+    setSaveProgress(70);
 
-    setTimeout(() => {
-      const payload: Partial<AuthUser> = {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        role,
-        documentRegistration: documentRegistration.trim() || undefined,
-        phone: phone.trim() || undefined,
-      };
-
-      if (newPassword && newPassword.trim()) {
-        payload.password = newPassword.trim();
-      }
-
-      const res = updateUser(user.id, payload);
-
-      if (res.success && res.user) {
-        setSaveProgress(100);
-        setSaveSuccess(true);
-        setIsSaving(false);
-        onUserUpdated(res.user);
-
-        setTimeout(() => {
-          onClose();
-        }, 1200);
-      } else {
+    if (canManage && newPassword.trim()) {
+      const passRes = await adminResetPassword(user.id, newPassword.trim());
+      if (!passRes.success) {
         setIsSaving(false);
         setSaveProgress(0);
-        setErrorMsg(res.error || 'Erro ao atualizar dados do usuário.');
+        onUserUpdated(res.user);
+        setErrorMsg(`Dados salvos, mas a senha não foi alterada: ${passRes.error}`);
+        return;
       }
-    }, 450);
+    }
+
+    setSaveProgress(100);
+    setSaveSuccess(true);
+    setIsSaving(false);
+    onUserUpdated(res.user);
+    setTimeout(() => {
+      onClose();
+    }, 1200);
   };
 
   return (
@@ -152,7 +153,8 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={isSaving}
+                disabled={isSaving || !canManage}
+                title={canManage ? undefined : 'Somente administradores podem alterar o e-mail'}
                 placeholder="Ex: carlos@consentra.com.br"
                 className="w-full h-10 px-3 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/40 text-[#0b1c30] focus:bg-white focus:outline-none font-mono text-[11.5px]"
                 required
@@ -163,14 +165,14 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
               <label className="block font-semibold text-[#404942] mb-1">Perfil / Função no Sistema</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as any)}
-                disabled={isSaving}
+                onChange={(e) => setRole(e.target.value as UserRole)}
+                disabled={isSaving || !canManage}
+                title={canManage ? undefined : 'Somente administradores podem alterar o perfil'}
                 className="w-full h-10 px-2 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/40 text-[#0b1c30] font-semibold focus:bg-white focus:outline-none"
               >
-                <option value="Responsável Técnico">Responsável Técnico</option>
-                <option value="Responsável Técnico e Administrador">Responsável Técnico e Administrador</option>
-                <option value="Comercial">Comercial</option>
-                <option value="Administrador">Administrador</option>
+                {USER_ROLES.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -201,6 +203,7 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
             </div>
           </div>
 
+          {canManage && (
           <div>
             <label className="block font-semibold text-[#404942] mb-1">
               Nova Senha de Acesso <span className="font-normal text-[#64748b]">(Deixe em branco para manter a atual)</span>
@@ -210,10 +213,11 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               disabled={isSaving}
-              placeholder="Digite a nova senha (mínimo 3 dígitos)..."
+              placeholder={`Digite a nova senha (mínimo ${MIN_PASSWORD_LENGTH} caracteres)...`}
               className="w-full h-10 px-3 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/40 text-[#0b1c30] focus:bg-white focus:outline-none font-mono"
             />
           </div>
+          )}
 
           {/* Barra de Progresso do Salvamento */}
           {isSaving && (

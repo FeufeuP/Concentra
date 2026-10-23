@@ -1,48 +1,18 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
+
+/**
+ * Origens extras autorizadas a acessar os recursos do servidor de desenvolvimento
+ * (HMR, chunks em /_next). Útil ao abrir o `npm run dev` por um domínio de preview/túnel.
+ * Ex.: ALLOWED_DEV_ORIGINS="*.e2b.app,meu-tunel.ngrok.app"
+ */
+const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: false,
-  },
-  // Allow access to remote image placeholder.
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**', // This allows any path under the hostname
-      },
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-  output: 'standalone',
-  transpilePackages: ['motion'],
-  env: {
-    VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '',
-  },
-  webpack: (config, {dev}) => {
-    // HMR is disabled in AI Studio via DISABLE_HMR env var.
-    // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-    if (dev && process.env.DISABLE_HMR === 'true') {
-      config.watchOptions = {
-        ignored: /.*/,
-      };
-    }
-    return config;
-  },
+  ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
 };
 
 export default nextConfig;

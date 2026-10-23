@@ -1,30 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Quote, QuoteItem, ClientData, QuoteStatus } from '@/lib/types';
-import { CATALOG_SERVICES, INITIAL_CLIENTS, DEFAULT_EMPTY_QUOTE } from '@/lib/mock-data';
+import { Quote, QuoteItem, ClientData, QuoteStatus, CatalogService } from '@/lib/types';
+import { DEFAULT_EMPTY_QUOTE } from '@/lib/mock-data';
 import { 
-  CASCADING_STATUS_LIST, 
-  CASCADING_MACRO_CATEGORIES, 
-  DEMAND_ORIGINS, 
-  PRIORITY_LEVELS, 
+  CASCADING_STATUS_LIST,
 } from '@/lib/classification-data';
 import { getStoredResponsibles } from '@/lib/responsibles';
 import { downloadQuotePdf } from '@/lib/pdf-generator';
 import { TabType } from './Sidebar';
-import { AuthUser, getCurrentUser } from '@/lib/auth';
+import { AuthUser, getCurrentUser, isAdminUser } from '@/lib/auth';
 import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
 import { getTodayFormatted, maskPhoneBR, calculateValidityDate } from '@/lib/masks';
+import { withTotals, updateItem, renumberItems, appendItem } from '@/lib/quote-calc';
+import { useToast } from './ui/ToastProvider';
+import { CatalogPickerModal } from './quote/CatalogPickerModal';
 
 interface NewQuoteViewProps {
   initialQuote: Quote;
   clients: ClientData[];
-  onSaveQuote: (quote: Quote) => void;
+  /** Catálogo de serviços persistido (Supabase ou localStorage). */
+  catalog: CatalogService[];
+  /** Salva o orçamento; devolve a versão salva (com número definitivo) ou null se falhar. */
+  onSaveQuote: (quote: Quote) => Promise<Quote | null>;
   onPreviewPdf: (quote: Quote) => void;
   onSendEmail: (quote: Quote) => void;
   setActiveTab: (tab: TabType) => void;
   responsiblePersons?: string[];
   onOpenServiceOrder?: (quote: Quote) => void;
+  /** Definido somente para orçamentos já salvos. */
+  onShowHistory?: (quote: Quote) => void;
   currentUser?: AuthUser | null;
 }
 
@@ -37,20 +42,22 @@ function generateItemId(prefix = 'item'): string {
 export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   initialQuote,
   clients = [],
+  catalog = [],
   onSaveQuote,
   onPreviewPdf,
   onSendEmail,
   setActiveTab,
   responsiblePersons,
   onOpenServiceOrder,
+  onShowHistory,
   currentUser,
 }) => {
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [adminModalTab, setAdminModalTab] = useState<'header' | 'texts'>('header');
-  const [adminToast, setAdminToast] = useState<string | null>(null);
+  const showToast = useToast();
 
-  const isAdmin = (currentUser?.role === 'Administrador') || 
-    (typeof window !== 'undefined' && getCurrentUser()?.role === 'Administrador');
+  const isAdmin = isAdminUser(currentUser || getCurrentUser());
+  const activeCatalog = catalog.filter((serv) => serv.status !== 'Inativo');
 
   // Lista dinâmica de responsáveis vinculada a Configurações (Item 4)
   const [responsiblesList, setResponsiblesList] = useState<string[]>(() => {
@@ -125,21 +132,9 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     return () => window.removeEventListener('consentra_responsibles_updated', handleUpdate);
   }, []);
 
-  // Recalculate totals
+  // Recalcula subtotal/total/parcela (regras em lib/quote-calc.ts)
   const updateQuoteTotals = (items: QuoteItem[], discountValue: number, installmentsCount: number) => {
-    const subtotal = items.reduce((acc, it) => acc + (it.quantity * it.unitPrice), 0);
-    const total = Math.max(subtotal - discountValue, 0);
-    const installmentValue = installmentsCount > 0 ? total / installmentsCount : total;
-
-    setQuote(prev => ({
-      ...prev,
-      items,
-      subtotal,
-      discount: discountValue,
-      total,
-      installments: installmentsCount,
-      installmentValue
-    }));
+    setQuote(prev => withTotals(prev, { items, discount: discountValue, installments: installmentsCount }));
   };
 
   const handleClientChange = (clientId: string) => {
@@ -165,47 +160,26 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   };
 
   const handleQuantityChange = (itemId: string, delta: number) => {
-    const currentItems = quote.items || [];
-    const newItems = currentItems.map(item => {
-      if (item.id === itemId) {
-        const newQty = Math.max(item.quantity + delta, 1);
-        return {
-          ...item,
-          quantity: newQty,
-          totalPrice: newQty * item.unitPrice
-        };
-      }
-      return item;
-    });
+    const newItems = (quote.items || []).map(item =>
+      item.id === itemId ? updateItem(item, { quantity: item.quantity + delta }) : item
+    );
     updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
   };
 
   const handlePriceChange = (itemId: string, price: number) => {
-    const safePrice = Math.max(price, 0);
-    const currentItems = quote.items || [];
-    const newItems = currentItems.map(item => {
-      if (item.id === itemId) {
-        return {
-          ...item,
-          unitPrice: safePrice,
-          totalPrice: item.quantity * safePrice
-        };
-      }
-      return item;
-    });
+    const newItems = (quote.items || []).map(item =>
+      item.id === itemId ? updateItem(item, { unitPrice: price }) : item
+    );
     updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
   };
 
   const handleRemoveItem = (itemId: string) => {
     const currentItems = quote.items || [];
     if (currentItems.length <= 1) {
-      alert('O orçamento deve conter no mínimo 1 item técnico.');
+      showToast('O orçamento deve conter no mínimo 1 item técnico.', 'error');
       return;
     }
-    const newItems = currentItems.filter(i => i.id !== itemId).map((it, idx) => ({
-      ...it,
-      itemNumber: idx + 1
-    }));
+    const newItems = renumberItems(currentItems.filter(i => i.id !== itemId));
     updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
   };
 
@@ -217,45 +191,22 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
       itemNumber: currentItems.length + 1,
       title: `${item.title} (Cópia)`
     };
-    const newItems = [...currentItems, duplicated];
-    updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
+    updateQuoteTotals([...currentItems, duplicated], quote.discount || 0, quote.installments || 1);
   };
 
-  const handleAddCatalogItem = (service: typeof CATALOG_SERVICES[0]) => {
-    const currentItems = quote.items || [];
-    const newItem: QuoteItem = {
-      id: generateItemId('item'),
-      itemNumber: currentItems.length + 1,
+  const handleAddCatalogItem = (service: CatalogService) => {
+    setQuote(prev => appendItem(prev, {
       title: service.title,
       description: service.description,
       unit: service.unit,
-      quantity: 1,
       unitPrice: service.suggestedPrice,
-      totalPrice: service.suggestedPrice
-    };
-    const newItems = [...currentItems, newItem];
-    const newRegulatory = Array.from(new Set([...(quote.regulatoryScope || []), service.nrCategory]));
-    setQuote(prev => ({ ...prev, regulatoryScope: newRegulatory }));
-    updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
+      nrCategory: service.nrCategory,
+    }, generateItemId('item')));
     setShowCatalogModal(false);
   };
 
   const handleQuickAddService = (title: string, desc: string, unit: string, price: number, nrTag: string) => {
-    const currentItems = quote.items || [];
-    const newItem: QuoteItem = {
-      id: generateItemId('item'),
-      itemNumber: currentItems.length + 1,
-      title,
-      description: desc,
-      unit,
-      quantity: 1,
-      unitPrice: price,
-      totalPrice: price
-    };
-    const newItems = [...currentItems, newItem];
-    const newRegulatory = Array.from(new Set([...(quote.regulatoryScope || []), nrTag]));
-    setQuote(prev => ({ ...prev, regulatoryScope: newRegulatory }));
-    updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
+    setQuote(prev => appendItem(prev, { title, description: desc, unit, unitPrice: price, nrCategory: nrTag }, generateItemId('item')));
   };
 
   const handleDiscountChange = (val: number) => {
@@ -263,26 +214,20 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   };
 
   const handlePaymentConditionSelect = (label: string, installments: number) => {
-    setQuote(prev => ({
-      ...prev,
-      paymentCondition: label,
-      installments
-    }));
-    updateQuoteTotals(quote.items || [], quote.discount || 0, installments);
+    setQuote(prev => withTotals({ ...prev, paymentCondition: label }, { installments }));
   };
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveProgress, setSaveProgress] = useState<number>(0);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
-  const [catalogSearch, setCatalogSearch] = useState<string>('');
 
   const getEffectiveResponsible = () => {
     return quote.responsibleTech || 
       (currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Responsável'})` : responsiblesList[0] || 'Washington Assis');
   };
 
-  const triggerSaveWithProgress = async (callback?: () => void) => {
+  const triggerSaveWithProgress = async (callback?: (saved: Quote) => void | Promise<void>) => {
     if (isSaving) return;
     setIsSaving(true);
     setSaveProgress(20);
@@ -290,11 +235,16 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     const quoteToSave = { ...quote, responsibleTech: currentResp };
     setQuote(quoteToSave);
 
-    await new Promise(r => setTimeout(r, 180));
     setSaveProgress(65);
-    onSaveQuote(quoteToSave);
+    const saved = await onSaveQuote(quoteToSave);
+    if (!saved) {
+      // Falha: a página já exibiu o erro; mantém as alterações no formulário
+      setIsSaving(false);
+      setSaveProgress(0);
+      return;
+    }
+    setQuote(saved);
 
-    await new Promise(r => setTimeout(r, 220));
     setSaveProgress(100);
     setSaveSuccess(true);
 
@@ -302,7 +252,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
       setIsSaving(false);
       setSaveProgress(0);
       setSaveSuccess(false);
-      if (callback) callback();
+      if (callback) void callback(saved);
     }, 450);
   };
 
@@ -311,11 +261,9 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   };
 
   const handleGeneratePdf = () => {
-    const currentResp = getEffectiveResponsible();
-    const quoteToSave = { ...quote, responsibleTech: currentResp };
-    triggerSaveWithProgress(async () => {
-      await downloadQuotePdf(quoteToSave);
-      onPreviewPdf(quoteToSave);
+    triggerSaveWithProgress(async (saved) => {
+      await downloadQuotePdf(saved);
+      onPreviewPdf(saved);
     });
   };
 
@@ -324,13 +272,15 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     const currentResp = getEffectiveResponsible();
     const quoteToSave = { ...quote, responsibleTech: currentResp };
     setQuote(quoteToSave);
-    onSaveQuote(quoteToSave);
-    await downloadQuotePdf(quoteToSave);
+    const saved = await onSaveQuote(quoteToSave);
+    if (saved) {
+      setQuote(saved);
+      await downloadQuotePdf(saved);
+    }
     setIsDownloadingPdf(false);
   };
 
   // Cascading classification calculations
-  const activeMacro = CASCADING_MACRO_CATEGORIES.find(m => m.name === quote.macroCategory) || CASCADING_MACRO_CATEGORIES[0];
   const activeStatusDef = CASCADING_STATUS_LIST.find(s => s.status === quote.status) || CASCADING_STATUS_LIST[0];
 
   const handleStatusChange = (newStatus: QuoteStatus) => {
@@ -340,48 +290,6 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
       ...prev,
       status: newStatus,
       statusSubStage: defaultSubStage
-    }));
-  };
-
-  const handleStatusSubStageChange = (subStage: string) => {
-    setQuote(prev => ({ ...prev, statusSubStage: subStage }));
-  };
-
-  const handleMacroCategoryChange = (macroName: string) => {
-    const macro = CASCADING_MACRO_CATEGORIES.find(m => m.name === macroName);
-    const defaultSub = macro?.subcategories[0]?.name || '';
-    setQuote(prev => ({
-      ...prev,
-      macroCategory: macroName,
-      subCategory: defaultSub
-    }));
-  };
-
-  const handleSubCategoryChange = (subName: string) => {
-    setQuote(prev => {
-      const macro = CASCADING_MACRO_CATEGORIES.find(m => m.name === (prev.macroCategory || CASCADING_MACRO_CATEGORIES[0].name));
-      const sub = macro?.subcategories.find(s => s.name === subName);
-      let newRegulatory = prev.regulatoryScope || [];
-      if (sub && !newRegulatory.includes(sub.nrCode)) {
-        newRegulatory = [...newRegulatory, sub.nrCode];
-      }
-      return {
-        ...prev,
-        subCategory: subName,
-        regulatoryScope: newRegulatory
-      };
-    });
-  };
-
-  const handleApplySubCategoryScope = () => {
-    const macro = CASCADING_MACRO_CATEGORIES.find(m => m.name === quote.macroCategory);
-    const sub = macro?.subcategories.find(s => s.name === quote.subCategory);
-    if (!sub) return;
-
-    const textToInsert = `[Escopo Vinculado - ${sub.nrCode}]: ${sub.name}. ${sub.defaultScope}`;
-    setQuote(prev => ({
-      ...prev,
-      scopeSummary: prev.scopeSummary ? `${prev.scopeSummary}\n• ${textToInsert}` : `• ${textToInsert}`
     }));
   };
 
@@ -492,20 +400,6 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
         </div>
       </div>
 
-      {adminToast && (
-        <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#004328] text-xs font-bold flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span>{adminToast}</span>
-          </div>
-          <button
-            onClick={() => setAdminToast(null)}
-            className="text-[#004328] hover:opacity-75"
-          >
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-      )}
 
       {/* Two Column Layout: Left Form (8 cols) and Right Summary Inspector (4 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1385,127 +1279,30 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
             {/* Auditoria Footer */}
             <div className="flex items-center justify-between text-[11px] text-[#49607e] pt-1">
               <span>Elaborado por: <strong>{getEffectiveResponsible()}</strong></span>
-              <span className="font-mono">CREA / MTE Vinculado</span>
+              {onShowHistory ? (
+                <button
+                  type="button"
+                  onClick={() => onShowHistory(quote)}
+                  className="flex items-center gap-1 font-semibold text-[#004328] hover:underline"
+                >
+                  <span className="material-symbols-outlined text-[14px]">history</span>
+                  Ver histórico
+                </button>
+              ) : (
+                <span className="font-mono">CREA / MTE Vinculado</span>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Catalog Modal */}
+      {/* Catálogo de serviços */}
       {showCatalogModal && (
-        <div className="fixed inset-0 bg-[#0b1c30]/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[85vh] overflow-y-auto border border-[#e5eeff]">
-            <div className="flex items-center justify-between pb-3 border-b border-[#eff4ff]">
-              <div>
-                <h3 className="font-bold text-base text-[#0b1c30]">Catálogo Oficial de Serviços SST Consentra</h3>
-                <p className="text-xs text-[#49607e]">Selecione um item regulatório para adicionar à proposta</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowCatalogModal(false);
-                  setCatalogSearch('');
-                }}
-                className="w-8 h-8 rounded-lg hover:bg-[#eff4ff] flex items-center justify-center text-[#49607e]"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-
-            {/* Search Bar for Official SST Catalog */}
-            <div className="pt-3 pb-1">
-              <div className="relative">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[#49607e]">
-                  search
-                </span>
-                <input
-                  type="text"
-                  value={catalogSearch}
-                  onChange={(e) => setCatalogSearch(e.target.value)}
-                  placeholder="Pesquisar por título, norma regulamentadora (ex: NR-01, NR-07), laudo ou descrição..."
-                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-[#eff4ff] text-xs text-[#0b1c30] placeholder-[#64748b] border border-[#c4dcff]/60 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  autoFocus
-                />
-                {catalogSearch && (
-                  <button
-                    onClick={() => setCatalogSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#49607e] hover:text-[#0b1c30] px-1 py-0.5"
-                  >
-                    Limpar
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2.5 py-4">
-              {CATALOG_SERVICES.filter(serv => {
-                if (!catalogSearch.trim()) return true;
-                const q = catalogSearch.toLowerCase();
-                return (
-                  serv.title.toLowerCase().includes(q) ||
-                  serv.description.toLowerCase().includes(q) ||
-                  serv.nrCategory.toLowerCase().includes(q) ||
-                  (serv.code && serv.code.toLowerCase().includes(q)) ||
-                  (serv.category && serv.category.toLowerCase().includes(q))
-                );
-              }).length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#64748b] bg-[#f8fafc] rounded-xl border border-dashed border-[#cbd5e1]">
-                  Nenhum serviço regulatório encontrado para &quot;{catalogSearch}&quot;.
-                </div>
-              ) : (
-                CATALOG_SERVICES.filter(serv => {
-                  if (!catalogSearch.trim()) return true;
-                  const q = catalogSearch.toLowerCase();
-                  return (
-                    serv.title.toLowerCase().includes(q) ||
-                    serv.description.toLowerCase().includes(q) ||
-                    serv.nrCategory.toLowerCase().includes(q) ||
-                    (serv.code && serv.code.toLowerCase().includes(q)) ||
-                    (serv.category && serv.category.toLowerCase().includes(q))
-                  );
-                }).map((serv) => (
-                  <div
-                    key={serv.id}
-                    className="p-3.5 rounded-xl border border-[#e5eeff] hover:border-[#004328] bg-[#f8f9ff] flex items-start justify-between gap-4 transition-colors"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#eff4ff] text-[#004328] font-mono">
-                          {serv.nrCategory}
-                        </span>
-                        <h4 className="font-bold text-xs text-[#0b1c30]">{serv.title}</h4>
-                      </div>
-                      <p className="text-[11px] text-[#49607e] mt-1 leading-relaxed">{serv.description}</p>
-                      <span className="text-[10px] text-[#49607e] font-mono mt-1 block">Unidade: {serv.unit}</span>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <span className="font-mono font-bold text-sm text-[#004328]">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(serv.suggestedPrice)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleAddCatalogItem(serv)}
-                        className="px-3 py-1.5 rounded-lg bg-[#004328] text-white text-xs font-semibold hover:bg-[#005c3e] transition-colors flex items-center gap-1"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">add</span>
-                        <span>Adicionar</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => setShowCatalogModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#eff4ff] text-[#0b1c30] text-xs font-semibold hover:bg-[#e5eeff]"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
+        <CatalogPickerModal
+          services={activeCatalog}
+          onSelect={handleAddCatalogItem}
+          onClose={() => setShowCatalogModal(false)}
+        />
       )}
 
       {/* Modal de Configuração Exclusiva do Administrador */}
@@ -1518,8 +1315,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
           if (onSaveQuote) {
             onSaveQuote(updatedQuote);
           }
-          setAdminToast('Textos e cabeçalho da proposta configurados pelo Administrador com sucesso!');
-          setTimeout(() => setAdminToast(null), 4000);
+          showToast('Textos e cabeçalho da proposta configurados pelo Administrador com sucesso!');
         }}
         initialTab={adminModalTab}
       />

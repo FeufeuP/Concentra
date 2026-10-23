@@ -2,7 +2,6 @@ import { Quote, ClientData, CatalogService } from './types';
 
 export const DIRECT_LOGO_URL = "/logo-consentra-horizontal.png";
 export const DIRECT_VERTICAL_LOGO_URL = "/logo-consentra-horizontal.png";
-export const DIRECT_MARK_LOGO_URL = "/logo-consentra-mark.png";
 
 export const COMPANY_PROFILE = {
   name: "CONSENTRA SEGURANÇA E MEDICINA DO TRABALHO LTDA",

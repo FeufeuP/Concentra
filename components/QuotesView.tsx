@@ -1,31 +1,31 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import { Quote, QuoteStatus } from '@/lib/types';
 import { getStoredResponsibles } from '@/lib/responsibles';
 import { downloadQuotePdf } from '@/lib/pdf-generator';
-import { TabType } from './Sidebar';
 
 interface QuotesViewProps {
   quotes: Quote[];
-  setActiveTab: (tab: TabType) => void;
   onOpenPdf: (quote: Quote) => void;
   onEditQuote: (quote: Quote) => void;
   onDuplicateQuote: (quote: Quote) => void;
   onDeleteQuote: (quoteId: string) => void;
-  onClearAllQuotes?: () => void;
+  /** Somente administradores. Recebe o texto digitado (deve ser "ZERAR"). */
+  onClearAllQuotes?: (confirmation: string) => Promise<boolean> | boolean | void;
   onUpdateQuoteStatus: (quoteId: string, newStatus: QuoteStatus) => void;
   onSendWhatsapp: (quote: Quote) => void;
   onSendEmail: (quote: Quote) => void;
   onStartNewQuote: () => void;
   responsiblePersons?: string[];
   onOpenServiceOrder?: (quote: Quote) => void;
+  onShowHistory?: (quote: Quote) => void;
   globalSearchQuery?: string;
 }
 
 export const QuotesView: React.FC<QuotesViewProps> = ({
   quotes,
-  setActiveTab,
   onOpenPdf,
   onEditQuote,
   onDuplicateQuote,
@@ -37,6 +37,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   onStartNewQuote,
   responsiblePersons,
   onOpenServiceOrder,
+  onShowHistory,
   globalSearchQuery,
 }) => {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -63,6 +64,8 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   const [downloadingQuoteId, setDownloadingQuoteId] = useState<string | null>(null);
   const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
   const [showClearAllModal, setShowClearAllModal] = useState<boolean>(false);
+  const [clearConfirmText, setClearConfirmText] = useState<string>('');
+  const [isClearingAll, setIsClearingAll] = useState<boolean>(false);
 
   const handleDownloadSingleQuote = async (quote: Quote) => {
     setDownloadingQuoteId(quote.id);
@@ -266,8 +269,11 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
             {onClearAllQuotes && quotes.length > 0 && (
               <button
                 type="button"
-                onClick={() => setShowClearAllModal(true)}
-                title="Apagar todos os orçamentos e zerar o sistema"
+                onClick={() => {
+                  setClearConfirmText('');
+                  setShowClearAllModal(true);
+                }}
+                title="Apagar todos os orçamentos e zerar o sistema (somente administradores)"
                 className="h-10 px-3.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs flex items-center gap-1.5 transition-colors border border-red-200"
               >
                 <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
@@ -539,6 +545,18 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
 
+                          {/* Histórico */}
+                          {onShowHistory && (
+                            <button
+                              onClick={() => onShowHistory(quote)}
+                              title="Histórico do Orçamento"
+                              aria-label="Histórico do Orçamento"
+                              className="p-1.5 rounded-lg bg-[#eff4ff] hover:bg-[#e5eeff] text-[#49607e] transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">history</span>
+                            </button>
+                          )}
+
                           {/* Duplicar */}
                           <button
                             onClick={() => onDuplicateQuote(quote)}
@@ -788,32 +806,56 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
             </div>
 
             <p className="text-xs text-[#49607e] leading-relaxed">
-              Você está prestes a apagar <strong>todos os {quotes.length} orçamentos</strong> cadastrados no sistema. Isso reiniciará a numeração para novas emissões de propostas comerciais.
+              Você está prestes a apagar <strong>todos os {quotes.length} orçamentos</strong> cadastrados no sistema
+              {isSupabaseConfigured() ? <> para <strong>todos os usuários</strong> (banco de dados no servidor)</> : <> neste navegador</>}.
+              {isSupabaseConfigured()
+                ? ' A numeração continua de onde parou (números já usados não são reaproveitados).'
+                : ' A numeração de novos orçamentos volta a começar em 319.'}
             </p>
 
             <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-800 flex items-start gap-2">
               <span className="material-symbols-outlined text-[18px] text-red-600 shrink-0 mt-0.5">report</span>
-              <span>Todos os dados de propostas comerciais anteriores serão apagados da memória e do armazenamento local. Certifique-se de exportar relatórios ou PDFs antes de prosseguir.</span>
+              <span>Esta ação não pode ser desfeita. Exporte relatórios ou PDFs antes de prosseguir.</span>
             </div>
+
+            <label className="flex flex-col gap-1.5 text-xs font-semibold text-[#0b1c30]">
+              Para confirmar, digite <span className="font-mono text-[#ba1a1a]">ZERAR</span>:
+              <input
+                type="text"
+                value={clearConfirmText}
+                onChange={(e) => setClearConfirmText(e.target.value)}
+                autoFocus
+                autoComplete="off"
+                className="h-10 px-3 rounded-xl border border-red-200 focus:border-[#ba1a1a] focus:ring-1 focus:ring-[#ba1a1a] outline-none font-mono text-sm"
+                placeholder="ZERAR"
+              />
+            </label>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-[#eff4ff]">
               <button
                 type="button"
                 onClick={() => setShowClearAllModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#eff4ff] text-[#0b1c30] text-xs font-semibold hover:bg-[#e5eeff]"
+                disabled={isClearingAll}
+                className="px-4 py-2 rounded-xl bg-[#eff4ff] text-[#0b1c30] text-xs font-semibold hover:bg-[#e5eeff] disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  onClearAllQuotes();
-                  setShowClearAllModal(false);
+                disabled={clearConfirmText !== 'ZERAR' || isClearingAll}
+                onClick={async () => {
+                  setIsClearingAll(true);
+                  try {
+                    const ok = await onClearAllQuotes(clearConfirmText);
+                    if (ok !== false) setShowClearAllModal(false);
+                  } finally {
+                    setIsClearingAll(false);
+                  }
                 }}
-                className="px-4 py-2 rounded-xl bg-[#ba1a1a] text-white text-xs font-semibold hover:bg-[#93000a] flex items-center gap-1.5 shadow-xs"
+                className="px-4 py-2 rounded-xl bg-[#ba1a1a] text-white text-xs font-semibold hover:bg-[#93000a] flex items-center gap-1.5 shadow-xs disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <span className="material-symbols-outlined text-[16px]">delete_forever</span>
-                <span>Sim, Zerar Todos os Orçamentos</span>
+                <span className={`material-symbols-outlined text-[16px] ${isClearingAll ? 'animate-spin' : ''}`}>{isClearingAll ? 'sync' : 'delete_forever'}</span>
+                <span>{isClearingAll ? 'Apagando...' : 'Sim, Zerar Todos os Orçamentos'}</span>
               </button>
             </div>
           </div>
