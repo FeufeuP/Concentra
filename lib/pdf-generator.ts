@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { Quote } from './types';
 import { getStoredLogoUrl } from './logo';
+import { assetPath } from './base-path';
 import { getStoredCompanyProfile, getStoredQuoteTexts, CompanyProfile, QuoteTextsConfig } from './company';
 import { getStoredResponsibles } from './responsibles';
 
@@ -161,7 +162,7 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
         <!-- Header: Logotipo e Dados Consentra -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 2px solid #145E5B; gap: 16px;">
           <div style="display: flex; align-items: center;">
-            <img src="${logoBase64 || '/logo-consentra-horizontal.png'}" alt="Consentra Segurança do Trabalho" style="height: 64px; max-width: 250px; object-fit: contain; object-position: left;" />
+            <img src="${logoBase64 || assetPath('/logo-consentra-horizontal.png')}" alt="Consentra Segurança do Trabalho" style="height: 64px; max-width: 250px; object-fit: contain; object-position: left;" />
           </div>
           <div style="text-align: right; font-size: 10px; color: #49607e; line-height: 1.35; display: flex; flex-direction: column; align-items: flex-end;">
             <span style="font-weight: bold; font-size: 12px; color: #145E5B;">${effectiveHeader.name}</span>

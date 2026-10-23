@@ -10,8 +10,25 @@ const allowedDevOrigins = (process.env.ALLOWED_DEV_ORIGINS || '')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+/**
+ * Prefixo público do app. Fica vazio no deploy tradicional (raiz do domínio) e
+ * vem "/<repositorio>" no GitHub Pages (site de projeto).
+ * Ex.: NEXT_PUBLIC_BASE_PATH=/Concentra
+ */
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH || '').trim().replace(/\/+$/, '');
+
+/**
+ * GitHub Pages só serve arquivos estáticos: `GITHUB_PAGES=true` gera o site em
+ * `out/` (`output: 'export'`), pronto para o workflow de deploy.
+ */
+const isStaticExport = process.env.GITHUB_PAGES === 'true';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  ...(basePath ? { basePath } : {}),
+  /* O export estático não tem otimizador de imagens do servidor. */
+  images: { unoptimized: true },
+  ...(isStaticExport ? ({ output: 'export', trailingSlash: true } as const) : {}),
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
 };
 

@@ -22,6 +22,7 @@
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 import { getSupabaseClient, isSupabaseConfigured, invokeEdgeFunction } from './supabase';
 import { addStoredResponsible } from './responsibles';
+import { BASE_PATH } from './base-path';
 
 export type UserRole =
   | 'Administrador'
@@ -578,7 +579,8 @@ export async function requestPasswordReset(email: string): Promise<AuthResult> {
   try {
     const client = requireClient();
     const { error } = await client.auth.resetPasswordForEmail(cleanEmail, {
-      redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      // BASE_PATH garante o retorno correto quando o app está em subpasta (GitHub Pages)
+      redirectTo: typeof window !== 'undefined' ? `${window.location.origin}${BASE_PATH}/` : undefined,
     });
     if (error) return { success: false, error: translateAuthError(error.message) };
     // Mensagem neutra: não revela se o e-mail existe
