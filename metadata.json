@@ -1,0 +1,6 @@
+{
+  "name": "Consentra - Gestão de SST",
+  "description": "Sistema integrado de emissão de orçamentos, pipeline comercial e gestão regulatória de Saúde e Segurança do Trabalho (SST).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
