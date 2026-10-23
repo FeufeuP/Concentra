@@ -1,0 +1,67 @@
+name: Deploy no GitHub Pages
+
+# Publica o app (build estático em out/) em https://<usuario>.github.io/<repositorio>/
+# Requer Settings → Pages → Source: "GitHub Actions".
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build estático
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build (Next.js export)
+        run: npm run build
+        env:
+          GITHUB_PAGES: 'true'
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          # Opcional: defina estes secrets no repositório para usar o Supabase
+          # (sem eles o site sobe em modo local, com dados no navegador).
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_TELEMETRY_DISABLED: '1'
+
+      # Sem Jekyll: os arquivos do build (incluindo _next/) são servidos como estão
+      - name: Desativar Jekyll
+        run: touch out/.nojekyll
+
+      - name: Empacotar site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

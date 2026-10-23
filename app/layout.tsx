@@ -1,17 +1,18 @@
 import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 import { AppProviders } from '@/components/providers/AppProviders';
+import { assetPath } from '@/lib/base-path';
 
 export const metadata: Metadata = {
   title: 'Consentra - Gestão de SST',
   description: 'Sistema integrado de emissão de orçamentos, pipeline comercial e gestão regulatória de Saúde e Segurança do Trabalho (SST).',
   icons: {
     icon: [
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: assetPath('/favicon-32x32.png'), sizes: '32x32', type: 'image/png' },
+      { url: assetPath('/favicon-192.png'), sizes: '192x192', type: 'image/png' },
     ],
-    shortcut: '/favicon-32x32.png',
-    apple: '/favicon-192.png',
+    shortcut: assetPath('/favicon-32x32.png'),
+    apple: assetPath('/favicon-192.png'),
   },
   openGraph: {
     title: 'Consentra - Gestão de SST',

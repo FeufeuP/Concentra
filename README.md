@@ -98,6 +98,7 @@ Não existe cadastro público: novos acessos são criados por um administrador e
 |---|---|
 | `npm run dev` | Servidor de desenvolvimento (porta 3000, escuta em `0.0.0.0`) |
 | `npm run build` | Build de produção |
+| `npm run build:pages` | Build estático para o GitHub Pages (saída em `out/`) |
 | `npm run start` | Servidor de produção (após o build) |
 | `npm run lint` | ESLint (regras do Next.js + TypeScript), sem tolerância a avisos |
 | `npm run typecheck` | Checagem de tipos com `tsc` |
@@ -108,6 +109,30 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes e build em cada p
 
 > Para abrir o servidor de desenvolvimento por um domínio de preview/túnel, defina
 > `ALLOWED_DEV_ORIGINS` (ex.: `ALLOWED_DEV_ORIGINS="*.ngrok.app" npm run dev`).
+
+## Publicar no GitHub Pages
+
+O site publicado em **<https://feufeup.github.io/Concentra/>** é gerado a partir do app (não é mais o
+README renderizado). O workflow [`.github/workflows/deploy-pages.yml`](./.github/workflows/deploy-pages.yml)
+faz o build estático (`next build` com `output: 'export'`) e publica a pasta `out/` a cada push na `main`.
+
+**Configuração necessária (uma única vez), no GitHub:**
+
+1. **Settings → Pages → Build and deployment → Source:** selecione **GitHub Actions**
+   (se ficar em *Deploy from a branch*, o Pages publica o conteúdo do repositório e o navegador
+   mostra o README em vez do sistema).
+2. Faça o merge desta alteração na `main`: o workflow roda sozinho e o link passa a abrir o sistema.
+3. (Opcional) Para usar o Supabase no site publicado — sem isso ele sobe em **modo local**, com os
+   dados no navegador — crie os secrets `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   em **Settings → Secrets and variables → Actions**, e inclua o domínio do Pages em
+   *Supabase → Authentication → URL Configuration → Redirect URLs* (`https://feufeup.github.io/Concentra/**`).
+
+O app é servido em uma subpasta (`/Concentra`), então o build do Pages define
+`NEXT_PUBLIC_BASE_PATH=/Concentra` (veja [`lib/base-path.ts`](./lib/base-path.ts)). O deploy normal
+(Vercel, servidor próprio, `npm run dev`) continua na raiz, sem esse prefixo.
+
+> Para testar localmente o resultado do Pages: `npm run build:pages` e depois sirva a pasta `out/`
+> (ex.: `npx serve out`). Em qualquer outro deploy, use `npm run build`.
 
 ## Banco de dados (Supabase)
 
