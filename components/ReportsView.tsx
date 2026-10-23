@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Quote, QuoteStatus } from '@/lib/types';
+import { BrandLogo } from './ui/BrandLogo';
+import { Quote } from '@/lib/types';
 import { downloadQuotePdf, downloadReportPdf, ReportItem, ReportSummary } from '@/lib/pdf-generator';
-import { TECHNICAL_RESPONSIBLES } from '@/lib/classification-data';
+import { responsibleFilterOptions } from '@/lib/responsibles';
 import { getStoredCompanyProfile, CompanyProfile } from '@/lib/company';
 import { getStoredLogoUrl } from '@/lib/logo';
 
@@ -11,7 +12,8 @@ interface ReportsViewProps {
   quotes: Quote[];
   onOpenPdf: (quote: Quote) => void;
   onDeleteQuote?: (quoteId: string) => void;
-  onBatchDeleteQuotes?: (quoteIds: string[]) => void;
+  /** Responsáveis cadastrados (Configurações). */
+  responsiblePersons?: string[];
 }
 
 const MONTHS_LIST = [
@@ -30,9 +32,8 @@ const MONTHS_LIST = [
   { value: '12', label: 'Dezembro' }
 ];
 
-const YEARS_LIST = ['2026', '2025', '2024', 'all'];
-
-export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onDeleteQuote, onBatchDeleteQuotes }) => {
+export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onDeleteQuote, responsiblePersons = [] }) => {
+  const responsibleOptions = useMemo(() => responsibleFilterOptions(responsiblePersons, quotes), [responsiblePersons, quotes]);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(() => getStoredCompanyProfile());
   const [logoUrl, setLogoUrl] = useState<string>(() => getStoredLogoUrl());
 
@@ -347,9 +348,9 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onD
               className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
             >
               <option value="all">Todos os Responsáveis</option>
-              {TECHNICAL_RESPONSIBLES.map((r) => (
-                <option key={r.name} value={r.name}>
-                  {r.name}
+              {responsibleOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -614,14 +615,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onD
         <div className="border-b-2 border-[#004328] pb-4 mb-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-              <img
-                src={logoUrl || '/logo-consentra-horizontal.png'}
+              <BrandLogo
+                src={logoUrl}
                 alt="Consentra Gestão SST"
                 className="h-12 w-auto max-w-[200px] object-contain"
                 style={{ objectFit: 'contain', width: 'auto', maxHeight: '48px' }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo-consentra-horizontal.png';
-                }}
               />
               <div>
                 <h1 className="text-xl font-bold text-[#004328]">{companyProfile.name}</h1>

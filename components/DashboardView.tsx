@@ -1,13 +1,19 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Quote, QuoteStatus } from '@/lib/types';
-import { 
-  CASCADING_STATUS_LIST, 
-  CASCADING_MACRO_CATEGORIES, 
-  PRIORITY_LEVELS, 
-  TECHNICAL_RESPONSIBLES 
-} from '@/lib/classification-data';
+import { Quote } from '@/lib/types';
+import { CASCADING_STATUS_LIST, CASCADING_MACRO_CATEGORIES } from '@/lib/classification-data';
+import {
+  DashboardFilters,
+  EMPTY_DASHBOARD_FILTERS,
+  filterQuotes,
+  computeKpis,
+  statusBreakdown,
+  serviceMix,
+  pendingQuotes,
+} from '@/lib/dashboard-metrics';
+import { DashboardFiltersBar } from './dashboard/DashboardFiltersBar';
+import { responsibleFilterOptions } from '@/lib/responsibles';
 import { TabType } from './Sidebar';
 
 interface DashboardViewProps {
@@ -17,6 +23,8 @@ interface DashboardViewProps {
   onStartNewQuote: () => void;
   onSendWhatsapp: (quote: Quote) => void;
   onSendEmail: (quote: Quote) => void;
+  /** Responsáveis cadastrados (Configurações). */
+  responsiblePersons?: string[];
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -26,121 +34,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onStartNewQuote,
   onSendWhatsapp,
   onSendEmail,
+  responsiblePersons = [],
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'mes' | '30dias' | 'trimestre'>('mes');
   const [hoveredMonth, setHoveredMonth] = useState<string | null>(null);
 
-  // Cascading Filters state
-  const [filterMacroCategory, setFilterMacroCategory] = useState<string>('all');
-  const [filterSubCategory, setFilterSubCategory] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterResponsibleTech, setFilterResponsibleTech] = useState<string>('all');
-  const [filterPriority, setFilterPriority] = useState<string>('all');
+  // Filtros em cascata (regras em lib/dashboard-metrics.ts)
+  const [filters, setFilters] = useState<DashboardFilters>(EMPTY_DASHBOARD_FILTERS);
+  const filteredQuotes = useMemo(() => filterQuotes(quotes, filters), [quotes, filters]);
+  const responsibleOptions = useMemo(() => responsibleFilterOptions(responsiblePersons, quotes), [responsiblePersons, quotes]);
+  const toggleMacroFilter = (macroName: string) =>
+    setFilters((prev) => ({ ...prev, macroCategory: prev.macroCategory === macroName ? 'all' : macroName, subCategory: 'all' }));
 
-  // Find active macro category object for cascading subcategories
-  const activeMacroForFilter = useMemo(() => {
-    return CASCADING_MACRO_CATEGORIES.find(m => m.name === filterMacroCategory);
-  }, [filterMacroCategory]);
+  // KPIs gerais e filtrados
+  const {
+    totalAll: totalOrcadoAll,
+    totalFiltered: totalOrcadoFiltered,
+    approvedCount,
+    totalApproved: totalAprovado,
+    pendingCount,
+    totalPending,
+    rejectedCount,
+    conversionRate,
+    lossRate,
+  } = useMemo(() => computeKpis(quotes, filteredQuotes), [quotes, filteredQuotes]);
 
-  const handleMacroFilterChange = (macroName: string) => {
-    setFilterMacroCategory(macroName);
-    setFilterSubCategory('all'); // Reset subcategory when macro changes
-  };
-
-  const handleResetFilters = () => {
-    setFilterMacroCategory('all');
-    setFilterSubCategory('all');
-    setFilterStatus('all');
-    setFilterResponsibleTech('all');
-    setFilterPriority('all');
-  };
-
-  const activeFilterCount = [
-    filterMacroCategory !== 'all',
-    filterSubCategory !== 'all',
-    filterStatus !== 'all',
-    filterResponsibleTech !== 'all',
-    filterPriority !== 'all'
-  ].filter(Boolean).length;
-
-  // Filtered quotes based on cascading menus
-  const filteredQuotes = useMemo(() => {
-    return quotes.filter(q => {
-      if (filterStatus !== 'all' && q.status !== filterStatus) return false;
-      if (filterMacroCategory !== 'all' && q.macroCategory !== filterMacroCategory) return false;
-      if (filterSubCategory !== 'all' && q.subCategory !== filterSubCategory) return false;
-      if (filterResponsibleTech !== 'all' && q.responsibleTech !== filterResponsibleTech) return false;
-      if (filterPriority !== 'all' && q.priority !== filterPriority) return false;
-      return true;
-    });
-  }, [quotes, filterStatus, filterMacroCategory, filterSubCategory, filterResponsibleTech, filterPriority]);
-
-  // Overall and filtered KPI calculations
-  const totalOrcadoAll = useMemo(() => quotes.reduce((acc, q) => acc + q.total, 0), [quotes]);
-  const totalOrcadoFiltered = useMemo(() => filteredQuotes.reduce((acc, q) => acc + q.total, 0), [filteredQuotes]);
-  
-  const approvedQuotes = useMemo(() => filteredQuotes.filter(q => q.status === 'Aprovado'), [filteredQuotes]);
-  const totalAprovado = useMemo(() => approvedQuotes.reduce((acc, q) => acc + q.total, 0), [approvedQuotes]);
-
-  const pendingQuotes = useMemo(() => filteredQuotes.filter(q => q.status === 'Aguardando Retorno' || q.status === 'Enviado'), [filteredQuotes]);
-  const totalPending = useMemo(() => pendingQuotes.reduce((acc, q) => acc + q.total, 0), [pendingQuotes]);
-
-  const rejectedQuotes = useMemo(() => filteredQuotes.filter(q => q.status === 'Reprovado'), [filteredQuotes]);
-
-  const conversionRate = filteredQuotes.length > 0 
-    ? ((approvedQuotes.length / filteredQuotes.length) * 100).toFixed(1) 
-    : '0.0';
-
-  const lossRate = filteredQuotes.length > 0 
-    ? ((rejectedQuotes.length / filteredQuotes.length) * 100).toFixed(1) 
-    : '0.0';
-
-  // 7-Status Accounting breakdown (contabilização nos 7 status)
-  const statusAccounting = useMemo(() => {
-    return CASCADING_STATUS_LIST.map(stDef => {
-      const matched = quotes.filter(q => q.status === stDef.status);
-      const sum = matched.reduce((acc, q) => acc + q.total, 0);
-      const pct = totalOrcadoAll > 0 ? ((sum / totalOrcadoAll) * 100).toFixed(1) : '0';
-      return {
-        ...stDef,
-        count: matched.length,
-        sum,
-        pct
-      };
-    });
-  }, [quotes, totalOrcadoAll]);
-
-  // Dynamic Mix de Serviços SST aggregation from real quotes
-  const mixDeServicos = useMemo(() => {
-    const counts: { [macroName: string]: { count: number; total: number; color: string } } = {};
-    
-    CASCADING_MACRO_CATEGORIES.forEach(m => {
-      counts[m.name] = { count: 0, total: 0, color: m.color || '#004328' };
-    });
-
-    quotes.forEach(q => {
-      const cat = q.macroCategory || 'Programas e Laudos Regulamentares';
-      if (!counts[cat]) {
-        counts[cat] = { count: 0, total: 0, color: '#004328' };
-      }
-      counts[cat].count += 1;
-      counts[cat].total += q.total;
-    });
-
-    return Object.entries(counts).map(([name, data]) => {
-      const pct = totalOrcadoAll > 0 ? ((data.total / totalOrcadoAll) * 100).toFixed(1) : '0';
-      return {
-        name,
-        count: data.count,
-        total: data.total,
-        pct,
-        color: data.color
-      };
-    }).sort((a, b) => b.total - a.total);
-  }, [quotes, totalOrcadoAll]);
+  // Pipeline nos 7 status e mix de serviços por macro categoria
+  const statusAccounting = useMemo(() => statusBreakdown(quotes, CASCADING_STATUS_LIST), [quotes]);
+  const mixDeServicos = useMemo(() => serviceMix(quotes, CASCADING_MACRO_CATEGORIES), [quotes]);
 
   // Urgent quotes (status Aguardando Retorno or Enviado)
-  const urgentQuotes = quotes.filter(q => q.status === 'Aguardando Retorno' || q.status === 'Enviado').slice(0, 3);
+  const urgentQuotes = pendingQuotes(quotes).slice(0, 3);
 
   // Recent quotes for preview table
   const recentQuotes = filteredQuotes.slice(0, 6);
@@ -247,136 +171,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* NOVO: Barra de Filtros em Cascata do Dashboard */}
-      <div className="p-4 rounded-2xl bg-white border border-[#e5eeff] shadow-[0_1px_4px_rgba(0,0,0,0.03)] flex flex-col gap-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#eff4ff]">
-          <div className="flex items-center gap-2 text-[#004328]">
-            <span className="material-symbols-outlined text-[20px]">filter_alt</span>
-            <span className="font-bold text-xs text-[#0b1c30]">
-              Filtros em Cascata & Segmentação Analítica do Dashboard
-            </span>
-            {activeFilterCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#004328] text-white">
-                {activeFilterCount} ativo{activeFilterCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-          {activeFilterCount > 0 && (
-            <button
-              onClick={handleResetFilters}
-              className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 flex items-center gap-1 transition-colors self-start sm:self-auto"
-            >
-              <span className="material-symbols-outlined text-[14px]">close</span>
-              Limpar Filtros ({filteredQuotes.length} de {quotes.length} orçamentos)
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {/* Cascading Filter 1: Macro Categoria SST */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#49607e] mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#004328]">category</span>
-              1. Macro Categoria SST
-            </label>
-            <select
-              value={filterMacroCategory}
-              onChange={(e) => handleMacroFilterChange(e.target.value)}
-              className="w-full h-9 px-2.5 rounded-xl bg-[#eff4ff] text-xs font-semibold text-[#0b1c30] border border-[#c4dcff]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-            >
-              <option value="all">Todas as Categorias</option>
-              {CASCADING_MACRO_CATEGORIES.map(m => (
-                <option key={m.id} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Cascading Filter 2: Subcategoria (Cascateia da macro) */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#49607e] mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#004328]">subdirectory_arrow_right</span>
-              2. Subcategoria / NR
-            </label>
-            <select
-              value={filterSubCategory}
-              onChange={(e) => setFilterSubCategory(e.target.value)}
-              disabled={filterMacroCategory === 'all'}
-              className="w-full h-9 px-2.5 rounded-xl bg-[#eff4ff] text-xs font-medium text-[#0b1c30] border border-[#c4dcff]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="all">
-                {filterMacroCategory === 'all' ? 'Selecione a Macro Categoria' : 'Todas as Subcategorias'}
-              </option>
-              {activeMacroForFilter?.subcategories.map(sc => (
-                <option key={sc.id} value={sc.name}>
-                  [{sc.nrCode}] {sc.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filter 3: Status Geral */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#49607e] mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#004328]">conversion_path</span>
-              3. Status do Orçamento
-            </label>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full h-9 px-2.5 rounded-xl bg-[#eff4ff] text-xs font-semibold text-[#0b1c30] border border-[#c4dcff]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-            >
-              <option value="all">Todos os Status ({quotes.length})</option>
-              {CASCADING_STATUS_LIST.map(st => (
-                <option key={st.status} value={st.status}>
-                  {st.status}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filter 4: Responsável Técnico */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#49607e] mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#004328]">person</span>
-              4. Responsável Técnico
-            </label>
-            <select
-              value={filterResponsibleTech}
-              onChange={(e) => setFilterResponsibleTech(e.target.value)}
-              className="w-full h-9 px-2.5 rounded-xl bg-[#eff4ff] text-xs font-medium text-[#0b1c30] border border-[#c4dcff]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-            >
-              <option value="all">Todos os Responsáveis</option>
-              {TECHNICAL_RESPONSIBLES.map(t => (
-                <option key={t.name} value={t.name}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filter 5: Prioridade */}
-          <div>
-            <label className="block text-[11px] font-semibold text-[#49607e] mb-1 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#004328]">flag</span>
-              5. Prioridade
-            </label>
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="w-full h-9 px-2.5 rounded-xl bg-[#eff4ff] text-xs font-medium text-[#0b1c30] border border-[#c4dcff]/40 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-            >
-              <option value="all">Todas as Prioridades</option>
-              {PRIORITY_LEVELS.map(p => (
-                <option key={p.value} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+      <DashboardFiltersBar
+        filters={filters}
+        onChange={setFilters}
+        filteredCount={filteredQuotes.length}
+        totalCount={quotes.length}
+        responsibles={responsibleOptions}
+      />
 
       {/* NOVO: Pipeline Contabilizado nos 7 Status de Orçamento */}
       <div className="flex flex-col gap-2">
@@ -392,12 +193,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
           {statusAccounting.map((st) => {
-            const isSelected = filterStatus === st.status;
+            const isSelected = filters.status === st.status;
             return (
               <button
                 key={st.status}
                 type="button"
-                onClick={() => setFilterStatus(isSelected ? 'all' : st.status)}
+                onClick={() => setFilters((prev) => ({ ...prev, status: isSelected ? 'all' : st.status }))}
                 className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 shadow-2xs ${
                   isSelected 
                     ? 'border-[#004328] ring-2 ring-[#004328]/30 bg-white' 
@@ -515,12 +316,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="mt-1.5">
               <div className="flex justify-between text-[10px] text-[#49607e] font-semibold mb-0.5">
                 <span>Qtd. Pendente</span>
-                <span className="text-[#49607e]">{pendingQuotes.length} propostas</span>
+                <span className="text-[#49607e]">{pendingCount} propostas</span>
               </div>
               <div className="w-full h-1.5 bg-[#eff4ff] rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-[#49607e] rounded-full" 
-                  style={{ width: `${filteredQuotes.length > 0 ? (pendingQuotes.length / filteredQuotes.length) * 100 : 0}%` }} 
+                  style={{ width: `${filteredQuotes.length > 0 ? (pendingCount / filteredQuotes.length) * 100 : 0}%` }} 
                 />
               </div>
             </div>
@@ -537,7 +338,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-[#004328] font-mono">{approvedQuotes.length}</span>
+              <span className="text-2xl font-bold text-[#004328] font-mono">{approvedCount}</span>
               <span className="text-xs text-[#49607e]">fechados</span>
             </div>
             <div className="flex items-center gap-1 mt-1 text-[11px] text-[#0d5c3a] font-semibold">
@@ -557,7 +358,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-bold text-[#ba1a1a] font-mono">{rejectedQuotes.length}</span>
+              <span className="text-2xl font-bold text-[#ba1a1a] font-mono">{rejectedCount}</span>
               <span className="text-xs text-[#49607e]">perdas</span>
             </div>
             <div className="flex items-center gap-1 mt-1 text-[11px] text-[#ba1a1a] font-semibold">
@@ -741,9 +542,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {mixDeServicos.map((item) => (
               <div 
                 key={item.name} 
-                onClick={() => setFilterMacroCategory(filterMacroCategory === item.name ? 'all' : item.name)}
+                onClick={() => toggleMacroFilter(item.name)}
                 className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                  filterMacroCategory === item.name 
+                  filters.macroCategory === item.name 
                     ? 'border-[#004328] bg-[#eff4ff]/60' 
                     : 'border-[#eff4ff] hover:bg-[#f8fafc]'
                 }`}

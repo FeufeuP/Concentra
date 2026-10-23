@@ -155,7 +155,7 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 | B13 ✅ | **Resolvido (Fase 3).** Logo customizado salvo como base64 no `localStorage` (limite ~5 MB) | `lib/logo.ts` | Pode estourar a cota e quebrar outras gravações |
 | B14 ✅ | **Resolvido (Fase 2).** Usuários nunca são sincronizados com o Supabase (funções existem mas não são chamadas) | `lib/supabase.ts` | Usuários existem só no navegador |
 | B15 ✅ | **Resolvido (Fase 2).** `process.env.VITE_*` não é exposto ao cliente no Next.js (apenas `NEXT_PUBLIC_*`) | `lib/supabase.ts:13-14` | Configuração confusa |
-| B16 | `alert()` / `confirm()` nativos misturados com toasts customizados | vários componentes | UX inconsistente |
+| B16 ✅ | **Resolvido (Fase 4).** `alert()` / `confirm()` nativos misturados com toasts customizados | vários componentes | UX inconsistente |
 
 ---
 
@@ -163,28 +163,29 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 
 ### 6.1 Arquivos nunca importados
 
-- `lib/supabaseClient.ts`
-- `lib/supabase-schema-text.ts` (cópia literal de `supabase/schema.sql` em string)
-- `lib/utils.ts` (função `cn`)
-- `hooks/use-mobile.ts`
-- `src/assets/` (pasta inteira)
+- ~~`lib/supabaseClient.ts`~~ ✅ removido
+- ~~`lib/supabase-schema-text.ts` (cópia literal de `supabase/schema.sql` em string)~~ ✅ removido
+- ~~`lib/utils.ts` (função `cn`)~~ ✅ removido (Fase 4, junto com `clsx` e `tailwind-merge`)
+- ~~`hooks/use-mobile.ts`~~ ✅ removido (Fase 4)
+- ~~`src/assets/` (pasta inteira)~~ ✅ removida (Fase 4)
 
 ### 6.2 Funções exportadas nunca chamadas
 
-- `syncAllLocalDataToSupabase`
-- `testSupabaseConnection`
-- `saveCustomSupabaseCredentials`
-- `fetchUsersFromSupabase`
-- `saveUserToSupabase`
+- ~~`syncAllLocalDataToSupabase`~~ ✅ removida
+- ~~`testSupabaseConnection`~~ ✅ removida
+- ~~`saveCustomSupabaseCredentials`~~ ✅ removida
+- ~~`fetchUsersFromSupabase`~~ ✅ removida
+- ~~`saveUserToSupabase`~~ ✅ removida
+- ~~`fetchQuotesFromSupabase` / `fetchClientsFromSupabase`, `DIRECT_MARK_LOGO_URL`, `DEFAULT_REAL_LOGO_URL`, handlers de classificação não usados em `NewQuoteView`~~ ✅ removidos (Fase 4)
 
 ### 6.3 Lógica duplicada
 
-- Filtros para remover o usuário "Carlos Eduardo" espalhados em `auth.ts` e `responsibles.ts`.
-- Lista padrão de responsáveis repetida em `auth.ts`, `responsibles.ts`, `classification-data.ts` e no SQL.
-- Bloco de opções do `html2pdf` copiado 3× em `lib/pdf-generator.ts` (linhas ~338, ~381, ~424).
+- ~~Filtros para remover o usuário "Carlos Eduardo" espalhados em `auth.ts` e `responsibles.ts`.~~ ✅ Centralizado em `sanitizeResponsibles()` (Fase 4).
+- ~~Lista padrão de responsáveis repetida em `auth.ts`, `responsibles.ts`, `classification-data.ts` e no SQL.~~ ✅ Fonte única `DEFAULT_RESPONSIBLES`; filtros usam a lista cadastrada (Fase 4).
+- ~~Bloco de opções do `html2pdf` copiado 3× em `lib/pdf-generator.ts` (linhas ~338, ~381, ~424).~~ ✅ `buildQuotePdfOptions()` (Fase 4).
 - ~~Lógica "próximo número de orçamento" repetida 3× em `app/page.tsx`.~~ ✅ Unificada (Fase 3).
 - ~~Toast duplicado em `app/page.tsx` (tela de login e tela principal).~~ ✅ Unificado (Fase 3).
-- Tags `<link rel="icon">` duplicadas manualmente em `layout.tsx` além de `metadata.icons`.
+- ~~Tags `<link rel="icon">` duplicadas manualmente em `layout.tsx` além de `metadata.icons`.~~ ✅ Removidas (Fase 4).
 
 ### 6.4 Assets duplicados (mesmo hash MD5)
 
@@ -196,6 +197,9 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 
 Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, `test-logo.svg`,
 `logo-shield.svg`, SVGs de 300–400 KB com bitmap embutido, etc.).
+
+✅ **Fase 4:** removidos todos os duplicados e não usados; `public/` ficou só com `favicon.ico`,
+`favicon-32x32.png`, `favicon-192.png` e `logo-consentra-horizontal.png` (~3,6 MB → ~0,3 MB).
 
 ---
 
@@ -259,16 +263,17 @@ Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, 
 - [x] Mover logo customizado para Supabase Storage (bucket público `branding`, escrita só admin, máx. 2 MB); no modo local, limite de 1 MB
 - [x] Importação dos dados que estavam só no navegador (orçamentos, clientes e configurações) em Configurações
 
-### Fase 4 — Arquitetura e qualidade de código
+### Fase 4 — Arquitetura e qualidade de código ✅
 
-- [ ] Quebrar `app/page.tsx` em rotas reais do App Router (`/orcamentos`, `/clientes`, …) ou em um store (Zustand/Context)
-- [ ] Dividir componentes grandes (`NewQuoteView`, `SettingsView`, `ServicesView`, `DashboardView`)
-- [ ] Criar camada de repositório única (local × Supabase) em vez de chamadas espalhadas
-- [ ] Extrair opções do `html2pdf` para uma constante/função única
-- [ ] Extrair componente `Toast` e substituir `alert`/`confirm` por modais próprios
-- [ ] Remover código morto (seção 6) e assets duplicados/não usados
-- [ ] Otimizar imagens (usar `next/image`, remover SVGs com bitmap embutido)
-- [ ] Adicionar testes (ex.: Vitest) para `masks.ts`, cálculo de totais/parcelas e mapeamentos do Supabase
+- [x] Quebrar `app/page.tsx` (846 → ~110 linhas): store em **Context** (`lib/store/AppDataContext.tsx`, hook `useAppData`) + `components/Workspace.tsx` (abas e modais). Escolhido Context em vez de rotas por ser menor o risco (estado compartilhado entre abas e fila de salvamento); rotas podem vir depois sobre o mesmo store
+- [x] Dividir componentes grandes: `SettingsView` (1385 → ~450; seções Usuários, Responsáveis e Logotipo em `components/settings/`), `NewQuoteView` (modal de catálogo em `components/quote/`, cálculos em `lib/quote-calc.ts`), `ServicesView` (drawer em `components/services/`), `DashboardView` (filtros em `components/dashboard/`, indicadores em `lib/dashboard-metrics.ts`)
+- [x] Camada de repositório única (`lib/repository`: interface + implementações local e Supabase); as telas não testam mais o modo
+- [x] Opções do `html2pdf` em `buildQuotePdfOptions()` (+ `quotePdfFileName()`)
+- [x] `ToastProvider` (`useToast`) e `DialogProvider` (`useDialog().confirm`) substituem os 10 `alert`/`confirm` e os toasts próprios de cada tela
+- [x] Código morto (seção 6) e assets duplicados/não usados removidos; `clsx`/`tailwind-merge` desinstalados
+- [x] Imagens: `public/` de ~3,6 MB para ~0,3 MB (sem SVGs com bitmap). Logotipo centralizado em `BrandLogo` com `<img>` justificado (logo dinâmico + html2canvas — `next/image` exigiria `unoptimized` sem ganho)
+- [x] Testes Vitest (48): máscaras/datas, totais/parcelas, mapeamentos do Supabase, repositório local/numeração, importação local/responsáveis, indicadores do dashboard e busca no catálogo. `npm test` no CI
+- [x] Lint com zero avisos (`--max-warnings=0`)
 
 ### Fase 5 — Funcionalidades reais
 

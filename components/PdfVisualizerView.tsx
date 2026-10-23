@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { BrandLogo } from './ui/BrandLogo';
 import { Quote } from '@/lib/types';
-import { COMPANY_PROFILE, DIRECT_LOGO_URL } from '@/lib/mock-data';
 import { getStoredLogoUrl } from '@/lib/logo';
 import { getStoredResponsibles } from '@/lib/responsibles';
 import { downloadQuotePdf, printQuotePdf } from '@/lib/pdf-generator';
-import { TabType } from './Sidebar';
 import { AuthUser, getCurrentUser, isAdminUser } from '@/lib/auth';
 import { 
   getStoredCompanyProfile, 
@@ -19,10 +18,8 @@ import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
 interface PdfVisualizerViewProps {
   quote: Quote;
   onBackToEdit: () => void;
-  setActiveTab: (tab: TabType) => void;
   onSendWhatsapp: (quote: Quote) => void;
   onSendEmail: (quote: Quote) => void;
-  onDuplicateQuote: (quote: Quote) => void;
   onOpenServiceOrder?: (quote: Quote) => void;
   responsiblePersons?: string[];
   currentUser?: AuthUser | null;
@@ -32,10 +29,8 @@ interface PdfVisualizerViewProps {
 export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
   quote,
   onBackToEdit,
-  setActiveTab,
   onSendWhatsapp,
   onSendEmail,
-  onDuplicateQuote,
   onOpenServiceOrder,
   responsiblePersons,
   currentUser,
@@ -299,13 +294,10 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
               {/* Header: Logo and Consentra Corporate Info */}
               <div className="flex items-center justify-between pb-5 border-b-2 border-[#145E5B] gap-4">
                 <div className="flex items-center">
-                  <img
-                    src={logoUrl || '/logo-consentra-horizontal.png'}
+                  <BrandLogo
+                    src={logoUrl}
                     alt="Consentra Segurança do Trabalho"
                     className="h-20 w-auto max-w-[260px] object-contain object-left"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/logo-consentra.png';
-                    }}
                   />
                 </div>
 

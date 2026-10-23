@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import { Quote } from './types';
-import { getStoredLogoUrl, DEFAULT_LOGO_URL } from './logo';
+import { getStoredLogoUrl } from './logo';
 import { getStoredCompanyProfile, getStoredQuoteTexts, CompanyProfile, QuoteTextsConfig } from './company';
 import { getStoredResponsibles } from './responsibles';
 
@@ -350,6 +350,41 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
 }
 
 /**
+ * Opções únicas do html2pdf.js para a proposta (A4 retrato, canvas 2x).
+ * Usadas por geração, download e impressão — altere aqui para mudar todas.
+ */
+export function buildQuotePdfOptions(filename?: string) {
+  return {
+    margin: 0,
+    ...(filename ? { filename } : {}),
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+      scrollX: 0,
+      scrollY: 0,
+    },
+    jsPDF: {
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'portrait',
+      compress: true,
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+  };
+}
+
+/** Nome do arquivo PDF da proposta: Proposta_Tecnica_Consentra_<número>_<cliente>.pdf */
+export function quotePdfFileName(quote: Pick<Quote, 'id' | 'numberOnly' | 'clientName'>): string {
+  const cleanNum = String(quote.numberOnly || quote.id).replace('#', '').trim();
+  const cleanClient = (quote.clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 25);
+  return `Proposta_Tecnica_Consentra_${cleanNum}_${cleanClient}.pdf`;
+}
+
+/**
  * Gera o documento jsPDF através da biblioteca html2pdf.js com renderização vetorial e canvas de alta fidelidade
  */
 export async function generateQuotePdfDoc(quote: Quote): Promise<jsPDF> {
@@ -359,26 +394,7 @@ export async function generateQuotePdfDoc(quote: Quote): Promise<jsPDF> {
     // Import dinâmico do html2pdf.js para compatibilidade SSR / App Router
     const html2pdf = await loadHtml2Pdf();
 
-    const opt = {
-      margin: 0,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    const opt = buildQuotePdfOptions();
 
     const pdf = await html2pdf().set(opt).from(element).toPdf().get('pdf');
     return pdf as jsPDF;
@@ -395,33 +411,11 @@ export async function downloadQuotePdf(quote: Quote): Promise<boolean> {
   const { element, cleanup } = await getOrBuildA4Element(quote);
 
   try {
-    const cleanNum = String(quote.numberOnly || quote.id).replace('#', '').trim();
-    const cleanClient = (quote.clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 25);
-    const fileName = `Proposta_Tecnica_Consentra_${cleanNum}_${cleanClient}.pdf`;
+    const fileName = quotePdfFileName(quote);
 
     const html2pdf = await loadHtml2Pdf();
 
-    const opt = {
-      margin: 0,
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    const opt = buildQuotePdfOptions(fileName);
 
     await html2pdf().set(opt).from(element).save();
     return true;
@@ -443,26 +437,7 @@ export async function printQuotePdf(quote: Quote): Promise<boolean> {
   try {
     const html2pdf = await loadHtml2Pdf();
 
-    const opt = {
-      margin: 0,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: 'portrait',
-        compress: true
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    const opt = buildQuotePdfOptions();
 
     const pdfWorker = html2pdf().set(opt).from(element);
     const blob: Blob = await pdfWorker.output('blob');

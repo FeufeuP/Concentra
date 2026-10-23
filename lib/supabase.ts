@@ -317,11 +317,6 @@ function notConnected<T>(): RemoteResult<T> {
 // ORÇAMENTOS (QUOTES) & ITENS
 // ==============================================================================
 
-export async function fetchQuotesFromSupabase(): Promise<Quote[] | null> {
-  const res = await fetchQuotes();
-  return res.success ? res.data : null;
-}
-
 export async function fetchQuotes(): Promise<RemoteResult<Quote[]>> {
   const client = getSupabaseClient();
   if (!client) return notConnected();
@@ -423,11 +418,6 @@ export async function clearAllQuotesInSupabase(confirmation: string): Promise<Re
 // ==============================================================================
 // CLIENTES (CLIENTS)
 // ==============================================================================
-
-export async function fetchClientsFromSupabase(): Promise<ClientData[] | null> {
-  const res = await fetchClients();
-  return res.success ? res.data : null;
-}
 
 export async function fetchClients(): Promise<RemoteResult<ClientData[]>> {
   const client = getSupabaseClient();

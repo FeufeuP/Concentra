@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useDialog } from './ui/DialogProvider';
+import { useToast } from './ui/ToastProvider';
 import { CatalogService } from '@/lib/types';
+import { ServiceFormDrawer } from './services/ServiceFormDrawer';
 
 interface ServicesViewProps {
   /** Catálogo persistido (Supabase ou localStorage), mantido pela página. */
@@ -13,7 +16,7 @@ interface ServicesViewProps {
   onSelectServiceForNewQuote?: (service: CatalogService) => void;
 }
 
-function nextServiceCode(services: CatalogService[]): string {
+export function nextServiceCode(services: CatalogService[]): string {
   const max = services.reduce((acc, s) => {
     const n = parseInt(String(s.code || '').replace(/\D/g, ''), 10);
     return Number.isFinite(n) && n > acc ? n : acc;
@@ -45,30 +48,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
   const [editingService, setEditingService] = useState<CatalogService | null>(null);
 
   // Drawer Form State
-  const [formCode, setFormCode] = useState<string>('');
-  const [formTitle, setFormTitle] = useState<string>('');
-  const [formSubtitle, setFormSubtitle] = useState<string>('');
-  const [formCategory, setFormCategory] = useState<string>('Programas NR');
-  const [formNr, setFormNr] = useState<string>('NR-01');
-  const [formUnit, setFormUnit] = useState<string>('Unidade');
-  const [formPrice, setFormPrice] = useState<number>(3800);
-  const [formDescription, setFormDescription] = useState<string>('');
-  const [formDeliverables, setFormDeliverables] = useState<string[]>([
-    'Emissão de Anotação de Responsabilidade Técnica (ART / CREA)',
-    'Visita técnica presencial com engenheiro de segurança credenciado',
-    'Entrega em formato digital PDF assinado com certificado ICP-Brasil'
-  ]);
-  const [formQuickSelect, setFormQuickSelect] = useState<boolean>(true);
-
-  // Toast State
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
-  };
+  const showToast = useToast();
+  const { confirm } = useDialog();
 
   // Categories for Filter Pills
   const categoriesList = [
@@ -127,104 +108,23 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
     return filteredServices.slice(start, start + itemsPerPage);
   }, [filteredServices, currentPage]);
 
-  // Open Drawer for New Service
   const handleOpenNewDrawer = () => {
-    const nextCodeNum = services.length + 1;
-    const nextCode = `#SRV-${nextCodeNum < 10 ? '0' : ''}${nextCodeNum}`;
-    
     setEditingService(null);
-    setFormCode(nextCode);
-    setFormTitle('');
-    setFormSubtitle('');
-    setFormCategory('Programas NR');
-    setFormNr('NR-01 Geral');
-    setFormUnit('Unidade');
-    setFormPrice(3000);
-    setFormDescription('');
-    setFormDeliverables([
-      'Emissão de Anotação de Responsabilidade Técnica (ART / CREA)',
-      'Visita técnica presencial com engenheiro de segurança credenciado',
-      'Entrega em formato digital PDF assinado com certificado ICP-Brasil'
-    ]);
-    setFormQuickSelect(true);
     setIsDrawerOpen(true);
   };
 
-  // Open Drawer for Editing Service
   const handleOpenEditDrawer = (service: CatalogService) => {
     setEditingService(service);
-    setFormCode(service.code || `#SRV-01`);
-    setFormTitle(service.title);
-    setFormSubtitle(service.subtitle || '');
-    setFormCategory(service.category || 'Programas NR');
-    setFormNr(service.nrCategory || 'NR-01');
-    setFormUnit(service.unit);
-    setFormPrice(service.suggestedPrice);
-    setFormDescription(service.description);
-    setFormDeliverables(service.deliverables || [
-      'Emissão de Anotação de Responsabilidade Técnica (ART / CREA)',
-      'Visita técnica presencial com engenheiro de segurança credenciado'
-    ]);
-    setFormQuickSelect(service.quickSelect ?? true);
     setIsDrawerOpen(true);
   };
 
-  // Save Service from Drawer
-  const handleSaveDrawer = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmitService = async (service: CatalogService, isNew: boolean) => {
     if (isPersisting) return;
-    if (!formTitle.trim()) {
-      showToast('Por favor, informe o nome do serviço.');
-      return;
-    }
-
-    if (editingService) {
-      // Update
-      const updated: CatalogService = {
-        ...editingService,
-        code: formCode,
-        title: formTitle,
-        subtitle: formSubtitle,
-        category: formCategory,
-        nrCategory: formNr,
-        unit: formUnit,
-        suggestedPrice: formPrice,
-        description: formDescription,
-        deliverables: formDeliverables,
-        quickSelect: formQuickSelect,
-        status: 'Ativo'
-      };
-
-      setIsPersisting(true);
-      const ok = await onSaveService(updated, false);
-      setIsPersisting(false);
-      if (!ok) return;
-      showToast(`Serviço ${formCode} atualizado com sucesso!`);
-    } else {
-      // Create new
-      const newId = `srv-${Date.now()}`;
-      const created: CatalogService = {
-        id: newId,
-        code: formCode,
-        title: formTitle,
-        subtitle: formSubtitle,
-        category: formCategory,
-        nrCategory: formNr,
-        unit: formUnit,
-        suggestedPrice: formPrice,
-        description: formDescription,
-        deliverables: formDeliverables,
-        quickSelect: formQuickSelect,
-        status: 'Ativo'
-      };
-
-      setIsPersisting(true);
-      const ok = await onSaveService(created, true);
-      setIsPersisting(false);
-      if (!ok) return;
-      showToast(`Novo serviço ${formCode} cadastrado no catálogo!`);
-    }
-
+    setIsPersisting(true);
+    const ok = await onSaveService(service, isNew);
+    setIsPersisting(false);
+    if (!ok) return;
+    showToast(isNew ? `Novo serviço ${service.code} cadastrado no catálogo!` : `Serviço ${service.code} atualizado com sucesso!`);
     setIsDrawerOpen(false);
   };
 
@@ -246,7 +146,13 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
 
   // Delete Service
   const handleDelete = async (serviceId: string, title: string) => {
-    if (window.confirm(`Tem certeza que deseja remover o serviço "${title}" do catálogo?`)) {
+    const ok = await confirm({
+      title: 'Remover serviço?',
+      message: `O serviço "${title}" será removido do catálogo.`,
+      confirmLabel: 'Remover',
+      tone: 'danger',
+    });
+    if (ok) {
       const ok = await onDeleteService(serviceId);
       if (!ok) return;
       setSelectedIds(prev => prev.filter(id => id !== serviceId));
@@ -283,13 +189,6 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
 
   return (
     <div className="flex flex-col w-full gap-6 max-w-7xl mx-auto">
-      {/* Toast feedback */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#004328] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-[#4edea3]/30 animate-in fade-in slide-in-from-bottom-5">
-          <span className="material-symbols-outlined text-[#4edea3] text-[20px]">check_circle</span>
-          <span className="text-xs font-medium">{toastMessage}</span>
-        </div>
-      )}
 
       {/* BREADCRUMB & CONTEXT HEADER */}
       <div className="flex flex-col gap-1">
@@ -740,232 +639,14 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
         </div>
       </div>
 
-      {/* CADASTRO / EDIÇÃO SLIDE-OVER DRAWER (MODAL ELEGANTE DO STITCH) */}
-      {/* Backdrop */}
-      {isDrawerOpen && (
-        <div
-          onClick={() => setIsDrawerOpen(false)}
-          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 transition-opacity animate-in fade-in"
-        />
-      )}
-
-      {/* Slide Drawer Panel */}
-      <aside
-        className={`fixed top-0 right-0 h-full w-full max-w-xl bg-white shadow-2xl z-50 transition-transform duration-300 ease-in-out flex flex-col justify-between overflow-y-auto ${
-          isDrawerOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        {/* Drawer Header */}
-        <div className="p-6 bg-[#eff4ff] flex items-start justify-between border-b border-[#e5eeff]">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold text-[#49607e] uppercase tracking-wider font-mono">
-              FORMULÁRIO TÉCNICO DE SST
-            </span>
-            <h2 className="text-xl sm:text-2xl font-bold text-[#0b1c30]">
-              {editingService ? `Editar Serviço ${formCode}` : 'Cadastrar Novo Serviço'}
-            </h2>
-            <p className="text-xs text-[#49607e] mt-0.5 leading-relaxed">
-              Configure o escopo técnico para refletir instantaneamente nas propostas comerciais e contratos.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsDrawerOpen(false)}
-            className="p-2 rounded-xl text-[#49607e] hover:bg-[#e5eeff] hover:text-[#0b1c30] transition-colors"
-          >
-            <span className="material-symbols-outlined text-[24px]">close</span>
-          </button>
-        </div>
-
-        {/* Drawer Body Form */}
-        <form onSubmit={handleSaveDrawer} className="p-6 flex flex-col gap-5 flex-1">
-          {/* Código e Nome do Serviço */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div className="sm:col-span-1 flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Código *</label>
-              <input
-                type="text"
-                value={formCode}
-                onChange={(e) => setFormCode(e.target.value)}
-                required
-                className="h-10 px-3 rounded-xl bg-[#eff4ff] text-xs font-mono font-bold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-              />
-            </div>
-
-            <div className="sm:col-span-3 flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Nome Oficial do Serviço / Laudo *</label>
-              <input
-                type="text"
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="Ex: Laudo de Periculosidade e Insalubridade"
-                required
-                className="h-10 px-3.5 rounded-xl bg-[#eff4ff] text-xs sm:text-sm text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-              />
-            </div>
-          </div>
-
-          {/* Subtítulo / Detalhe Rápido */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#0b1c30]">Subtítulo Normativo / Especialidade</label>
-            <input
-              type="text"
-              value={formSubtitle}
-              onChange={(e) => setFormSubtitle(e.target.value)}
-              placeholder="Ex: Inventário + Plano de Ação ou Aposentadoria Especial"
-              className="h-10 px-3.5 rounded-xl bg-[#eff4ff] text-xs sm:text-sm text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-            />
-          </div>
-
-          {/* Duas Colunas: Categoria e NR */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Categoria Normativa *</label>
-              <select
-                value={formCategory}
-                onChange={(e) => setFormCategory(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-[#eff4ff] text-xs text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-              >
-                <option value="Programas NR">Programas & Gestão (NRs)</option>
-                <option value="Laudos Técnicos">Laudos & Avaliações Técnicas</option>
-                <option value="Treinamentos">Treinamentos Obrigatórios</option>
-                <option value="Saúde Ocupacional">Saúde Ocupacional (PCMSO)</option>
-                <option value="Gestão eSocial">Gestão eSocial SST</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Norma Regulamentadora (NR)</label>
-              <input
-                type="text"
-                value={formNr}
-                onChange={(e) => setFormNr(e.target.value)}
-                placeholder="Ex: NR-01, NR-15, NR-35..."
-                className="h-10 px-3.5 rounded-xl bg-[#eff4ff] text-xs text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-              />
-            </div>
-          </div>
-
-          {/* Duas Colunas: Unidade de Medida e Preço Base */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Unidade de Medida *</label>
-              <select
-                value={formUnit}
-                onChange={(e) => setFormUnit(e.target.value)}
-                className="h-10 px-3 rounded-xl bg-[#eff4ff] text-xs text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
-              >
-                <option value="Unidade">Unidade (Documento Fechado)</option>
-                <option value="Laudo">Por Laudo Emitido</option>
-                <option value="Turma (15p)">Por Turma Presencial (15p)</option>
-                <option value="Turma">Por Turma</option>
-                <option value="Vidas / Exame">Por Colaborador / Vida</option>
-                <option value="Mensalidade">Mensalidade Recorrente</option>
-                <option value="Hora-Técnica">Hora-Técnica Especializada</option>
-                <option value="Por Equip.">Por Equipamento Avaliado</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#0b1c30]">Valor Padrão de Referência (R$) *</label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-mono text-[#49607e] font-bold text-xs">
-                  R$
-                </span>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formPrice}
-                  onChange={(e) => setFormPrice(parseFloat(e.target.value) || 0)}
-                  className="h-10 pl-10 pr-3.5 rounded-xl bg-[#eff4ff] font-mono text-sm font-bold text-[#004328] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a] w-full"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Descrição Detalhada do Escopo */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-[#0b1c30]">Descrição do Escopo Técnico Padrão *</label>
-              <span className="text-[11px] text-[#49607e]">Exportado para a proposta em PDF</span>
-            </div>
-            <textarea
-              rows={4}
-              value={formDescription}
-              onChange={(e) => setFormDescription(e.target.value)}
-              placeholder="Descreva o escopo, metodologia de vistoria, elaboração de matriz de risco e cronograma executivo..."
-              className="p-3.5 rounded-xl bg-[#eff4ff] text-xs text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a] leading-relaxed resize-none"
-            />
-          </div>
-
-          {/* Checklist de Entregáveis / Inclusos Padrão */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold text-[#0b1c30]">Checklist de Entregáveis Obrigatórios</label>
-            <div className="flex flex-col gap-2 p-3.5 bg-[#eff4ff] rounded-xl text-xs">
-              {[
-                'Emissão de Anotação de Responsabilidade Técnica (ART / CREA)',
-                'Visita técnica presencial com engenheiro de segurança credenciado',
-                'Entrega em formato digital PDF assinado com certificado ICP-Brasil',
-                'Acompanhamento em auditorias presenciais do MTE',
-                'Upload automático dos eventos no eSocial'
-              ].map((item) => {
-                const isSelected = formDeliverables.includes(item);
-                return (
-                  <label key={item} className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => {
-                        if (isSelected) {
-                          setFormDeliverables(formDeliverables.filter(d => d !== item));
-                        } else {
-                          setFormDeliverables([...formDeliverables, item]);
-                        }
-                      }}
-                      className="rounded text-[#004328] focus:ring-[#004328] h-4 w-4"
-                    />
-                    <span className="text-[#0b1c30] text-[11px]">{item}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Switch de Disponibilidade Rápida */}
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#eff4ff]">
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-[#0b1c30]">Seleção Rápida em Orçamentos</span>
-              <span className="text-[11px] text-[#49607e]">Exibir como item de destaque no gerador comercial</span>
-            </div>
-            <input
-              type="checkbox"
-              checked={formQuickSelect}
-              onChange={(e) => setFormQuickSelect(e.target.checked)}
-              className="w-5 h-5 rounded text-[#004328] focus:ring-[#004328] cursor-pointer"
-            />
-          </div>
-
-          {/* Drawer Footer Actions */}
-          <div className="pt-4 border-t border-[#eff4ff] flex items-center justify-end gap-3 mt-auto">
-            <button
-              type="button"
-              onClick={() => setIsDrawerOpen(false)}
-              className="px-5 h-11 rounded-xl bg-[#eff4ff] hover:bg-[#e5eeff] text-[#0b1c30] text-xs font-semibold transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isPersisting}
-              className="flex items-center gap-1.5 px-6 h-11 rounded-xl bg-[#0d5c3a] text-white text-xs font-semibold hover:bg-[#004328] shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait"
-            >
-              <span className={`material-symbols-outlined text-[18px] ${isPersisting ? 'animate-spin' : ''}`}>{isPersisting ? 'sync' : 'save'}</span>
-              <span>{isPersisting ? 'Salvando...' : editingService ? 'Salvar Alterações' : 'Cadastrar Serviço'}</span>
-            </button>
-          </div>
-        </form>
-      </aside>
+      <ServiceFormDrawer
+        isOpen={isDrawerOpen}
+        service={editingService}
+        defaultCode={nextServiceCode(services)}
+        isSaving={isPersisting}
+        onClose={() => setIsDrawerOpen(false)}
+        onSubmit={handleSubmitService}
+      />
     </div>
   );
 };

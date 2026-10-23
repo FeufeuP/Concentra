@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { BrandLogo } from './ui/BrandLogo';
 import { AuthUser, loginUser, requestPasswordReset, isRemoteAuth } from '@/lib/auth';
 import { getStoredLogoUrl } from '@/lib/logo';
-import { DIRECT_LOGO_URL } from '@/lib/mock-data';
 
 interface LoginViewProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -101,14 +101,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, initialErr
         <div className="lg:col-span-6 flex flex-col items-center lg:items-start text-center lg:text-left">
           {/* Logo with proper aspect ratio */}
           <div className="mb-6 p-4 bg-white rounded-2xl shadow-sm border border-[#e2e8f0] inline-flex items-center justify-center">
-            <img
-              src={logoUrl || DIRECT_LOGO_URL}
+            <BrandLogo
+              src={logoUrl}
               alt="Consentra Gestão SST"
               className="h-16 sm:h-20 w-auto max-w-[260px] object-contain"
               style={{ objectFit: 'contain', width: 'auto', maxHeight: '72px' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = DIRECT_LOGO_URL;
-              }}
             />
           </div>
 

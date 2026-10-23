@@ -1,4 +1,4 @@
-import { COMPANY_PROFILE, DIRECT_LOGO_URL } from './mock-data';
+import { COMPANY_PROFILE } from './mock-data';
 import { pushSetting, SETTING_KEYS } from './remote-sync';
 
 export interface CompanyProfile {

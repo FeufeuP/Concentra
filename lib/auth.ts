@@ -21,6 +21,7 @@
 
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 import { getSupabaseClient, isSupabaseConfigured } from './supabase';
+import { addStoredResponsible } from './responsibles';
 
 export type UserRole =
   | 'Administrador'
@@ -307,14 +308,7 @@ function addToResponsibles(user: AuthUser): void {
   // Responsáveis técnicos passam a aparecer na lista de "Responsável pelo Orçamento"
   if (user.role !== 'Responsável Técnico' && user.role !== 'Responsável Técnico e Administrador') return;
   try {
-    const respKey = 'consentra_quote_responsibles';
-    const existing = localStorage.getItem(respKey);
-    const list: string[] = existing ? JSON.parse(existing) : ['Washington Assis', 'Dra. Mariana Rios', 'Tec. Roberto Silva'];
-    if (!list.includes(user.name)) {
-      list.push(user.name);
-      localStorage.setItem(respKey, JSON.stringify(list));
-      window.dispatchEvent(new CustomEvent('consentra_responsibles_updated', { detail: list }));
-    }
+    addStoredResponsible(user.name);
   } catch {
     // erro secundário — ignora
   }

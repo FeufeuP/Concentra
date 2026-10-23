@@ -215,9 +215,3 @@ export const PRIORITY_LEVELS = [
   { value: 'Baixa / Planejamento', label: 'Baixa / Planejamento', badge: 'bg-slate-100 text-slate-800 border-slate-200' }
 ];
 
-export const TECHNICAL_RESPONSIBLES = [
-  { name: 'Washington Assis', role: 'Engenheiro de Segurança do Trabalho (CREA/SP 506.892/D)' },
-  { name: 'Dra. Mariana Rios', role: 'Médica do Trabalho Coordenadora (CRM/SP 142.809)' },
-  { name: 'Tec. Roberto Silva', role: 'Técnico de Segurança do Trabalho (MTE/SP 0048291)' },
-  { name: 'Amanda Silveira', role: 'Gerente Comercial & Contratos Corporativos' }
-];

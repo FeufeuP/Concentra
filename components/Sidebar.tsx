@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { DIRECT_LOGO_URL } from '@/lib/mock-data';
+import { BrandLogo } from './ui/BrandLogo';
 import { AuthUser } from '@/lib/auth';
 import { getStoredLogoUrl } from '@/lib/logo';
 
@@ -101,14 +101,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="flex items-center cursor-pointer group py-1"
               onClick={() => handleNavClick('dashboard')}
             >
-              <img
-                src={logoUrl || '/logo-consentra-horizontal.png'}
+              <BrandLogo
+                src={logoUrl}
                 alt="Consentra Segurança do Trabalho"
                 className="h-10 w-auto max-w-[210px] object-contain object-left group-hover:scale-[1.02] transition-transform"
                 style={{ objectFit: 'contain', width: 'auto', maxHeight: '40px' }}
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/logo-consentra-horizontal.png';
-                }}
               />
             </div>
 

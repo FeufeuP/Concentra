@@ -34,10 +34,11 @@ relatórios e geração de PDF.
 | Estilos | Tailwind CSS v4 |
 | Banco (opcional) | [Supabase](https://supabase.com) (PostgreSQL) |
 | PDF | `html2pdf.js` + `jspdf` |
+| Testes | [Vitest](https://vitest.dev) |
 
 ## Requisitos
 
-- **Node.js 20.9+** (recomendado 22 LTS)
+- **Node.js 20.9+** para rodar o app; **22.12+** para rodar os testes (Vitest 5). Recomendado: 22 LTS
 - npm 10+
 
 ## Como rodar
@@ -92,8 +93,12 @@ Não existe cadastro público: novos acessos são criados por um administrador e
 | `npm run dev` | Servidor de desenvolvimento (porta 3000, escuta em `0.0.0.0`) |
 | `npm run build` | Build de produção |
 | `npm run start` | Servidor de produção (após o build) |
-| `npm run lint` | ESLint (regras do Next.js + TypeScript) |
+| `npm run lint` | ESLint (regras do Next.js + TypeScript), sem tolerância a avisos |
 | `npm run typecheck` | Checagem de tipos com `tsc` |
+| `npm test` | Testes unitários (Vitest) |
+| `npm run test:watch` | Testes em modo watch |
+
+O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes e build em cada push/PR.
 
 > Para abrir o servidor de desenvolvimento por um domínio de preview/túnel, defina
 > `ALLOWED_DEV_ORIGINS` (ex.: `ALLOWED_DEV_ORIGINS="*.ngrok.app" npm run dev`).
@@ -161,13 +166,39 @@ de envios. Para uso real, configure um SMTP próprio em **Authentication → Ema
 ## Estrutura
 
 ```
-app/            layout e página principal (SPA com navegação por abas)
-components/     telas e modais (Dashboard, Orçamentos, Novo Orçamento, PDF, Clientes, Serviços, Relatórios, Configurações…)
-hooks/          hooks React
-lib/            regras de negócio: auth, acesso ao Supabase, gerador de PDF, máscaras, tipos, dados padrão
-public/         logos e favicons
-supabase/       schema SQL (+ upgrade_fase3.sql), políticas RLS, seed de usuários e Edge Function admin-users
+app/                    layout (providers globais) e página: valida a sessão → login ou área de trabalho
+components/
+  Workspace.tsx         área autenticada: abas, orçamento em edição e modais
+  *View.tsx             telas (Dashboard, Orçamentos, Novo Orçamento, PDF, Clientes, Serviços, Relatórios, Configurações)
+  settings/ services/ dashboard/ quote/   partes extraídas das telas grandes
+  ui/                   Toast, diálogo de confirmação e logotipo (BrandLogo)
+  providers/            AppProviders (Toast + diálogos)
+lib/
+  store/                AppDataContext — estado e operações de dados (useAppData)
+  repository/           camada de dados única: local (localStorage) × Supabase + regra de numeração
+  quote-calc.ts         cálculo de itens, subtotal, desconto e parcelas
+  dashboard-metrics.ts  filtros e indicadores do dashboard
+  supabase.ts auth.ts   acesso ao Supabase e autenticação
+  pdf-generator.ts …    PDF, máscaras, tipos, dados padrão, configurações
+tests/                  testes Vitest
+public/                 logo e favicons
+supabase/               schema SQL (+ upgrade_fase3.sql), políticas RLS, seed de usuários e Edge Function admin-users
 ```
+
+### Arquitetura
+
+- **Dados:** as telas usam `useAppData()` (`lib/store/AppDataContext.tsx`), que grava sempre pelo
+  repositório (`lib/repository`). O repositório é escolhido pela configuração: com as variáveis do
+  Supabase → `createSupabaseRepository()`; sem elas → `createLocalRepository()` (localStorage).
+  Nenhuma tela precisa saber em qual modo está.
+- **Context em vez de rotas:** o sistema é uma SPA autenticada com estado compartilhado entre as
+  abas (orçamento em edição, fila de salvamento que evita números duplicados). O Context oferece
+  o desacoplamento necessário com risco menor que migrar para rotas do App Router — que podem vir
+  depois, reutilizando o mesmo store.
+- **Avisos e confirmações:** `useToast()` e `useDialog().confirm()` (`components/ui`); não há
+  `alert()`/`confirm()` nativos.
+- **Logotipo:** `BrandLogo` usa `<img>` de propósito (logo dinâmico em data URL/Storage e captura
+  pelo html2canvas no PDF); é a única exceção à regra `no-img-element`.
 
 ## Roadmap
 

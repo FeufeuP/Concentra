@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useDialog } from './ui/DialogProvider';
+import { useToast } from './ui/ToastProvider';
 import { getPendingLocalData, importLocalData, markLocalImportDone, LocalImportResult, PendingLocalData } from '@/lib/local-import';
 
 interface LocalDataImportCardProps {
   isAdmin: boolean;
   canWrite: boolean;
-  onShowToast?: (msg: string, type?: 'success' | 'error') => void;
   /** Chamado após a importação, para recarregar os dados do servidor. */
   onImported?: () => void;
 }
@@ -15,7 +16,9 @@ interface LocalDataImportCardProps {
  * Cartão exibido em Configurações (modo Supabase) quando existem orçamentos,
  * clientes ou configurações salvos somente neste navegador.
  */
-export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmin, canWrite, onShowToast, onImported }) => {
+export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmin, canWrite, onImported }) => {
+  const showToast = useToast();
+  const { confirm } = useDialog();
   const [pending, setPending] = useState<PendingLocalData | null>(() => getPendingLocalData());
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<LocalImportResult | null>(null);
@@ -30,11 +33,11 @@ export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmi
       setResult(res);
       setPending(getPendingLocalData());
       if (res.errors.length === 0) {
-        onShowToast?.(
+        showToast(
           `Importação concluída: ${res.quotesImported} orçamento(s) e ${res.clientsImported} cliente(s) enviados ao servidor.`
         );
       } else {
-        onShowToast?.(`Importação com ${res.errors.length} erro(s). Veja os detalhes em Configurações.`, 'error');
+        showToast(`Importação com ${res.errors.length} erro(s). Veja os detalhes em Configurações.`, 'error');
       }
       onImported?.();
     } finally {
@@ -42,8 +45,13 @@ export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmi
     }
   };
 
-  const handleDiscard = () => {
-    if (!confirm('Ignorar os dados salvos neste navegador? Eles não serão enviados ao servidor (nada é apagado do navegador).')) return;
+  const handleDiscard = async () => {
+    const ok = await confirm({
+      title: 'Ignorar dados deste navegador?',
+      message: 'Eles não serão enviados ao servidor (nada é apagado do navegador).',
+      confirmLabel: 'Ignorar',
+    });
+    if (!ok) return;
     markLocalImportDone();
     setPending(null);
     setResult(null);

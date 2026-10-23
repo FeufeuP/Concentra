@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useDialog } from './ui/DialogProvider';
+import { useToast } from './ui/ToastProvider';
 import { Quote } from '@/lib/types';
 import { 
   getStoredCompanyProfile, 
@@ -10,8 +12,7 @@ import {
   resetStoredCompanyProfile, 
   resetStoredQuoteTexts,
   CompanyProfile,
-  QuoteTextsConfig,
-  DEFAULT_QUOTE_TEXTS
+  QuoteTextsConfig
 } from '@/lib/company';
 
 interface AdminQuoteConfigModalProps {
@@ -19,7 +20,6 @@ interface AdminQuoteConfigModalProps {
   onClose: () => void;
   quote?: Quote;
   onApplyToQuote?: (updatedQuote: Quote) => void;
-  onShowToast?: (msg: string) => void;
   initialTab?: 'header' | 'texts';
 }
 
@@ -27,9 +27,10 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
   onClose,
   quote,
   onApplyToQuote,
-  onShowToast,
   initialTab = 'header'
 }) => {
+  const { confirm } = useDialog();
+  const showToast = useToast();
   const [activeTab, setActiveTab] = useState<'header' | 'texts'>(initialTab);
 
   // Perfil da Empresa / Cabeçalho
@@ -105,9 +106,7 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
     };
 
     onApplyToQuote(updatedQuote);
-    if (onShowToast) {
-      onShowToast('Configurações aplicadas ao orçamento com sucesso!');
-    }
+    showToast('Configurações aplicadas ao orçamento com sucesso!');
     onClose();
   };
 
@@ -118,22 +117,23 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
     if (quote && onApplyToQuote) {
       handleApplyToCurrentQuote();
     } else {
-      if (onShowToast) {
-        onShowToast('Configurações salvas como padrão oficial da empresa!');
-      }
+      showToast('Configurações salvas como padrão oficial da empresa!');
       onClose();
     }
   };
 
-  const handleResetDefaults = () => {
-    if (confirm('Deseja restaurar todos os textos e cabeçalhos padrão do sistema?')) {
+  const handleResetDefaults = async () => {
+    const ok = await confirm({
+      title: 'Restaurar padrões?',
+      message: 'Todos os textos e o cabeçalho da proposta voltarão aos valores padrão do sistema.',
+      confirmLabel: 'Restaurar',
+    });
+    if (ok) {
       const resetHeader = resetStoredCompanyProfile();
       const resetTexts = resetStoredQuoteTexts();
       setHeaderData(resetHeader);
       setTextsData(resetTexts);
-      if (onShowToast) {
-        onShowToast('Padrões restaurados com sucesso.');
-      }
+      showToast('Padrões restaurados com sucesso.');
     }
   };
 

@@ -1,7 +1,6 @@
 import { pushSetting, SETTING_KEYS } from './remote-sync';
 
 export const DEFAULT_LOGO_URL = '/logo-consentra-horizontal.png';
-export const DEFAULT_REAL_LOGO_URL = '/logo-consentra-horizontal.png';
 
 const LOGO_STORAGE_KEY = 'consentra_custom_logo';
 export const LOGO_LOCAL_STORAGE_KEY = LOGO_STORAGE_KEY;

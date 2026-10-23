@@ -5,11 +5,9 @@ import { isSupabaseConfigured } from '@/lib/supabase';
 import { Quote, QuoteStatus } from '@/lib/types';
 import { getStoredResponsibles } from '@/lib/responsibles';
 import { downloadQuotePdf } from '@/lib/pdf-generator';
-import { TabType } from './Sidebar';
 
 interface QuotesViewProps {
   quotes: Quote[];
-  setActiveTab: (tab: TabType) => void;
   onOpenPdf: (quote: Quote) => void;
   onEditQuote: (quote: Quote) => void;
   onDuplicateQuote: (quote: Quote) => void;
@@ -27,7 +25,6 @@ interface QuotesViewProps {
 
 export const QuotesView: React.FC<QuotesViewProps> = ({
   quotes,
-  setActiveTab,
   onOpenPdf,
   onEditQuote,
   onDuplicateQuote,
