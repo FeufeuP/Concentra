@@ -10,7 +10,8 @@ import { PdfVisualizerView } from '@/components/PdfVisualizerView';
 import { ClientsView } from '@/components/ClientsView';
 import { ServicesView } from '@/components/ServicesView';
 import { SettingsView } from '@/components/SettingsView';
-import { EmailModal } from '@/components/EmailModal';
+import { EmailModal, EmailSentInfo } from '@/components/EmailModal';
+import { QuoteHistoryModal } from '@/components/quote/QuoteHistoryModal';
 import { ServiceOrderModal } from '@/components/ServiceOrderModal';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { ReportsView } from '@/components/ReportsView';
@@ -40,6 +41,7 @@ export function Workspace({ onLogout }: WorkspaceProps) {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [emailQuoteTarget, setEmailQuoteTarget] = useState<Quote | null>(null);
   const [serviceOrderQuote, setServiceOrderQuote] = useState<Quote | null>(null);
+  const [historyQuote, setHistoryQuote] = useState<Quote | null>(null);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
 
@@ -143,19 +145,51 @@ export function Workspace({ onLogout }: WorkspaceProps) {
     showToast(`Iniciando envio no WhatsApp para ${quote.clientName}...`);
   };
 
-  const handleOpenEmailModal = (quote: Quote) => setEmailQuoteTarget(quote);
+  const isSavedQuote = (quote: Quote) => quotes.some((q) => q.id === quote.id);
+
+  // O e-mail fica registrado no histórico do orçamento: exige orçamento salvo
+  const handleOpenEmailModal = (quote: Quote) => {
+    if (!isSavedQuote(quote)) {
+      showToast('Salve o orçamento antes de enviá-lo por e-mail.', 'error');
+      return;
+    }
+    setEmailQuoteTarget(quote);
+  };
+
+  const handleEmailSent = async (quote: Quote, info: EmailSentInfo) => {
+    const num = String(quote.numberOnly || quote.id).replace('#', '');
+    if (info.markAsSent) await handleUpdateQuoteStatus(quote.id, 'Enviado');
+    showToast(
+      info.automatic
+        ? `Proposta Nº ${num} enviada para ${info.to.join(', ')}.`
+        : `PDF da proposta Nº ${num} baixado. Anexe-o no seu aplicativo de e-mail.`
+    );
+  };
+
+  const handleShowHistory = (quote: Quote) => setHistoryQuote(quote);
+
+  // Clique numa notificação: abre o orçamento correspondente
+  const handleOpenQuoteById = (quoteId: string) => {
+    const quote = quotes.find((q) => q.id === quoteId);
+    if (quote) handleEditQuote(quote);
+    else showToast('Orçamento não encontrado (pode ter sido excluído).', 'error');
+  };
   const handleOpenServiceOrder = (quote: Quote) => setServiceOrderQuote(quote);
 
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30]">
-      <EmailModal
-        quote={emailQuoteTarget}
-        isOpen={emailQuoteTarget !== null}
-        onClose={() => setEmailQuoteTarget(null)}
-        onSentSuccess={() => {
-          showToast(`Proposta Nº ${emailQuoteTarget?.numberOnly || emailQuoteTarget?.id.replace('#', '')} enviada com sucesso por e-mail!`);
-        }}
-      />
+      {emailQuoteTarget && (
+        <EmailModal
+          key={emailQuoteTarget.id}
+          quote={emailQuoteTarget}
+          onClose={() => setEmailQuoteTarget(null)}
+          onSent={(info) => void handleEmailSent(emailQuoteTarget, info)}
+        />
+      )}
+
+      {historyQuote && (
+        <QuoteHistoryModal key={historyQuote.id} quote={historyQuote} onClose={() => setHistoryQuote(null)} />
+      )}
 
       <ServiceOrderModal
         quote={serviceOrderQuote}
@@ -191,6 +225,8 @@ export function Workspace({ onLogout }: WorkspaceProps) {
           currentUser={currentUser}
           onLogout={onLogout}
           onOpenChangePassword={() => setShowChangePasswordModal(true)}
+          quotes={quotes}
+          onOpenQuote={handleOpenQuoteById}
         />
 
         <main className="flex-1 p-4 sm:p-8 pt-20 sm:pt-22">
@@ -247,6 +283,7 @@ export function Workspace({ onLogout }: WorkspaceProps) {
                   onStartNewQuote={handleStartNewQuote}
                   responsiblePersons={responsiblePersons}
                   onOpenServiceOrder={handleOpenServiceOrder}
+                  onShowHistory={handleShowHistory}
                   globalSearchQuery={searchQuery}
                 />
               )}
@@ -271,6 +308,7 @@ export function Workspace({ onLogout }: WorkspaceProps) {
                   setActiveTab={setActiveTab}
                   responsiblePersons={responsiblePersons}
                   onOpenServiceOrder={handleOpenServiceOrder}
+                  onShowHistory={isSavedQuote(currentQuote) ? handleShowHistory : undefined}
                   currentUser={currentUser}
                 />
               )}

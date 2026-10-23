@@ -150,8 +150,8 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 | B8 ✅ | **Resolvido (Fase 3).** Erros de gravação no Supabase são ignorados (`.catch(() => {})`) e o toast de sucesso aparece mesmo assim | `app/page.tsx` | Usuário não sabe que falhou |
 | B9 ✅ | **Resolvido (Fase 3).** Datas armazenadas como texto `dd/mm/aaaa` (`issue_date`, `validity_date`) | `supabase/schema.sql` | Ordenação/filtros incorretos no banco |
 | B10 ✅ | **Resolvido (Fases 2/3).** Seeds do SQL divergem do código (`user_washington` × `user-washington`; "Mariana Souza" × "Dra. Mariana Rios"; lista de responsáveis diferente de `lib/responsibles.ts`); dados da empresa também divergem (`app_settings` × `COMPANY_PROFILE`) | `supabase/schema.sql`, `lib/auth.ts`, `lib/mock-data.ts` | Inconsistência de dados |
-| B11 | Envio de e-mail é **simulado** (`setTimeout` + toast de "enviado") | `components/EmailModal.tsx:29` | Funcionalidade falsa |
-| B12 | Notificações fixas no código, incluindo "Sistema Conectado ao Supabase — Ativo" mesmo sem conexão | `components/Header.tsx:103` | Informação enganosa |
+| B11 ✅ | **Resolvido (Fase 5).** Envio de e-mail é **simulado** (`setTimeout` + toast de "enviado") | `components/EmailModal.tsx:29` | Funcionalidade falsa |
+| B12 ✅ | **Resolvido (Fase 5).** Notificações fixas no código, incluindo "Sistema Conectado ao Supabase — Ativo" mesmo sem conexão | `components/Header.tsx:103` | Informação enganosa |
 | B13 ✅ | **Resolvido (Fase 3).** Logo customizado salvo como base64 no `localStorage` (limite ~5 MB) | `lib/logo.ts` | Pode estourar a cota e quebrar outras gravações |
 | B14 ✅ | **Resolvido (Fase 2).** Usuários nunca são sincronizados com o Supabase (funções existem mas não são chamadas) | `lib/supabase.ts` | Usuários existem só no navegador |
 | B15 ✅ | **Resolvido (Fase 2).** `process.env.VITE_*` não é exposto ao cliente no Next.js (apenas `NEXT_PUBLIC_*`) | `lib/supabase.ts:13-14` | Configuração confusa |
@@ -275,9 +275,10 @@ Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, 
 - [x] Testes Vitest (48): máscaras/datas, totais/parcelas, mapeamentos do Supabase, repositório local/numeração, importação local/responsáveis, indicadores do dashboard e busca no catálogo. `npm test` no CI
 - [x] Lint com zero avisos (`--max-warnings=0`)
 
-### Fase 5 — Funcionalidades reais
+### Fase 5 — Funcionalidades reais ✅
 
-- [ ] Envio de e-mail real com PDF anexo (Resend / SMTP via Supabase Edge Function ou API Route)
-- [ ] Notificações calculadas a partir dos dados (orçamentos vencendo, aguardando retorno, etc.)
-- [ ] Indicador real de status da conexão com o Supabase
-- [ ] Histórico/auditoria de alterações de status do orçamento
+- [x] Envio de e-mail real com PDF anexo: Edge Function `send-quote-email` (Resend). O PDF é gerado no navegador e anexado. A função exige sessão e perfil com escrita, valida destinatários (máx. 5), assunto, mensagem e anexo (8 MB), escapa o HTML e usa o e-mail de quem enviou como *reply-to*. Sem a chave `RESEND_API_KEY`/`EMAIL_FROM` (ou no modo local), o app faz o **envio manual**: baixa o PDF e abre o aplicativo de e-mail com tudo preenchido. Opção de atualizar o status de Rascunho para Enviado
+- [x] Notificações calculadas a partir dos orçamentos (`lib/notifications.ts`): vencidas e a vencer em até 3 dias (Enviado/Aguardando Retorno), retorno pendente há 7+ dias, rascunho parado há 7+ dias. Contador de não lidas (guardadas por usuário). O clique abre o orçamento
+- [x] Indicador real de conexão (`lib/connection-status.ts`): Online / Sem conexão / Sessão expirada / Modo local. Consulta o banco a cada 60 s, ao voltar à aba, em eventos online/offline do navegador e após falhas de gravação
+- [x] Histórico/auditoria do orçamento: tabela `quote_events` gravada **só pelo servidor** (trigger em `quotes` registra criação, mudança de status e exclusão com o usuário; a Edge Function registra os e-mails). Leitura para usuários logados, sem alteração pelo app; sem FK, então a exclusão continua registrada. Linha do tempo em Orçamentos (ícone de histórico) e no editor ("Ver histórico"). No modo local, o histórico fica no navegador
+- [x] Testes (69 no total): notificações, validação/mailto/conteúdo do e-mail, regras de eventos, histórico do repositório local, mapeamento `quote_events` e classificação da conexão

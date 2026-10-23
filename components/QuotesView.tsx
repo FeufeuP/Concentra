@@ -20,6 +20,7 @@ interface QuotesViewProps {
   onStartNewQuote: () => void;
   responsiblePersons?: string[];
   onOpenServiceOrder?: (quote: Quote) => void;
+  onShowHistory?: (quote: Quote) => void;
   globalSearchQuery?: string;
 }
 
@@ -36,6 +37,7 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
   onStartNewQuote,
   responsiblePersons,
   onOpenServiceOrder,
+  onShowHistory,
   globalSearchQuery,
 }) => {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -542,6 +544,18 @@ export const QuotesView: React.FC<QuotesViewProps> = ({
                           >
                             <span className="material-symbols-outlined text-[18px]">edit</span>
                           </button>
+
+                          {/* Histórico */}
+                          {onShowHistory && (
+                            <button
+                              onClick={() => onShowHistory(quote)}
+                              title="Histórico do Orçamento"
+                              aria-label="Histórico do Orçamento"
+                              className="p-1.5 rounded-lg bg-[#eff4ff] hover:bg-[#e5eeff] text-[#49607e] transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">history</span>
+                            </button>
+                          )}
 
                           {/* Duplicar */}
                           <button

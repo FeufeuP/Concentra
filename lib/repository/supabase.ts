@@ -10,6 +10,7 @@ import {
   deleteClientFromSupabase,
   saveCatalogService,
   deleteCatalogService,
+  fetchQuoteEventsFromSupabase,
 } from '../supabase';
 import { pullRemoteSettings } from '../settings-sync';
 import type { DataRepository, RepoResult } from './types';
@@ -46,5 +47,6 @@ export function createSupabaseRepository(): DataRepository {
     deleteClient: async (id) => toResult(await deleteClientFromSupabase(id)),
     saveService: async (service) => toResult(await saveCatalogService(service)),
     deleteService: async (id) => toResult(await deleteCatalogService(id)),
+    fetchQuoteEvents: (quoteId) => fetchQuoteEventsFromSupabase(quoteId),
   };
 }

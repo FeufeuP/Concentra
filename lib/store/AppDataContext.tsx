@@ -29,6 +29,9 @@ import { SETTINGS_SYNC_ERROR_EVENT, SettingsSyncErrorDetail } from '../remote-sy
 import { getPendingLocalData } from '../local-import';
 import { getTodayFormatted, calculateValidityDate } from '../masks';
 import { useToast } from '@/components/ui/ToastProvider';
+import { requestConnectionRecheck } from '../connection-status';
+import type { QuoteEvent } from '../quote-events';
+import type { RepoResult } from '../repository';
 
 export type DataStatus = 'loading' | 'ready' | 'error';
 
@@ -65,6 +68,8 @@ export interface AppDataStore {
   saveService(service: CatalogService, isNew: boolean): Promise<boolean>;
   deleteService(serviceId: string): Promise<boolean>;
   setResponsiblePersons(list: string[]): void;
+  /** Histórico do orçamento (mais recente primeiro). Não exibe toast. */
+  fetchQuoteHistory(quoteId: string): Promise<RepoResult<QuoteEvent[]>>;
 }
 
 const AppDataContext = createContext<AppDataStore | null>(null);
@@ -170,7 +175,10 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const handleFailure = useCallback(
     (action: string, err?: string) => {
       showToast(`${action}: ${err || 'erro desconhecido'}`, 'error');
-      if (isRemote) void reload({ silent: true });
+      if (isRemote) {
+        requestConnectionRecheck();
+        void reload({ silent: true });
+      }
     },
     [isRemote, reload, showToast]
   );
@@ -416,6 +424,8 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
     [ensureCanWrite, repo, handleFailure]
   );
 
+  const fetchQuoteHistory = useCallback((quoteId: string) => repo.fetchQuoteEvents(quoteId), [repo]);
+
   const value = useMemo<AppDataStore>(
     () => ({
       user,
@@ -443,11 +453,13 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
       saveService,
       deleteService,
       setResponsiblePersons,
+      fetchQuoteHistory,
     }),
     [
       user, isRemote, status, error, quotes, clients, catalog, responsiblePersons, canWrite, isAdmin,
       reload, ensureCanWrite, makeDraftQuote, persistQuote, saveQuote, duplicateQuote, updateQuoteStatus,
       deleteQuote, clearAllQuotes, addClient, editClient, deleteClient, saveService, deleteService,
+      fetchQuoteHistory,
     ]
   );
 

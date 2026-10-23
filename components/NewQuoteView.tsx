@@ -28,6 +28,8 @@ interface NewQuoteViewProps {
   setActiveTab: (tab: TabType) => void;
   responsiblePersons?: string[];
   onOpenServiceOrder?: (quote: Quote) => void;
+  /** Definido somente para orçamentos já salvos. */
+  onShowHistory?: (quote: Quote) => void;
   currentUser?: AuthUser | null;
 }
 
@@ -47,6 +49,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   setActiveTab,
   responsiblePersons,
   onOpenServiceOrder,
+  onShowHistory,
   currentUser,
 }) => {
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
@@ -1276,7 +1279,18 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
             {/* Auditoria Footer */}
             <div className="flex items-center justify-between text-[11px] text-[#49607e] pt-1">
               <span>Elaborado por: <strong>{getEffectiveResponsible()}</strong></span>
-              <span className="font-mono">CREA / MTE Vinculado</span>
+              {onShowHistory ? (
+                <button
+                  type="button"
+                  onClick={() => onShowHistory(quote)}
+                  className="flex items-center gap-1 font-semibold text-[#004328] hover:underline"
+                >
+                  <span className="material-symbols-outlined text-[14px]">history</span>
+                  Ver histórico
+                </button>
+              ) : (
+                <span className="font-mono">CREA / MTE Vinculado</span>
+              )}
             </div>
           </div>
         </div>

@@ -20,7 +20,7 @@
 // =============================================================================
 
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
-import { getSupabaseClient, isSupabaseConfigured } from './supabase';
+import { getSupabaseClient, isSupabaseConfigured, invokeEdgeFunction } from './supabase';
 import { addStoredResponsible } from './responsibles';
 
 export type UserRole =
@@ -368,26 +368,8 @@ function translateAuthError(message: string | undefined): string {
 
 /** Chama a Edge Function admin-users (o token da sessão é enviado automaticamente). */
 async function invokeAdmin<T = { profile?: ProfileRow; success?: boolean }>(body: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
-  const client = requireClient();
-  const { data, error } = await client.functions.invoke('admin-users', { body });
-  if (error) {
-    // Extrai a mensagem { error } retornada pela função, se houver
-    let msg = error.message;
-    const ctx = (error as { context?: unknown }).context;
-    if (ctx instanceof Response) {
-      try {
-        const parsed = await ctx.clone().json();
-        if (parsed?.error) msg = parsed.error;
-      } catch {
-        /* resposta sem JSON */
-      }
-    }
-    return { error: msg || 'Erro ao comunicar com o servidor.' };
-  }
-  if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
-    return { error: (data as { error: string }).error };
-  }
-  return { data: data as T };
+  const res = await invokeEdgeFunction<T>('admin-users', body);
+  return res.error ? { error: res.error } : { data: res.data };
 }
 
 // =============================================================================

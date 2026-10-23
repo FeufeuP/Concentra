@@ -1,4 +1,5 @@
 import { isSupabaseConfigured } from '../supabase';
+import { getCurrentUser } from '../auth';
 import { createLocalRepository } from './local';
 import { createSupabaseRepository } from './supabase';
 import type { DataRepository } from './types';
@@ -10,5 +11,10 @@ export { QUOTE_NUMBER_BASE, nextProvisionalNumber, resolveLocalQuoteNumber } fro
 
 /** Repositório conforme a configuração: Supabase (variáveis definidas) ou localStorage. */
 export function createRepository(): DataRepository {
-  return isSupabaseConfigured() ? createSupabaseRepository() : createLocalRepository();
+  if (isSupabaseConfigured()) return createSupabaseRepository();
+  // Modo local: o histórico registra o usuário logado neste navegador
+  return createLocalRepository(undefined, () => {
+    const user = getCurrentUser();
+    return user ? { id: user.id, name: user.name } : null;
+  });
 }

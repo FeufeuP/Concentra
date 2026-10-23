@@ -3,6 +3,15 @@ import { INITIAL_QUOTES, INITIAL_CLIENTS, CATALOG_SERVICES } from '../mock-data'
 import { LOCAL_QUOTES_KEY, LOCAL_CLIENTS_KEY } from '../local-import';
 import { resolveLocalQuoteNumber } from './numbering';
 import type { DataRepository, RepoResult } from './types';
+import {
+  LOCAL_EVENTS_KEY,
+  appendEvents,
+  eventForDelete,
+  eventsForSave,
+  eventsOfQuote,
+  type EventActor,
+  type QuoteEvent,
+} from '../quote-events';
 
 export const LOCAL_CATALOG_KEY = 'consentra_catalog_data';
 
@@ -22,7 +31,10 @@ function browserStorage(): KeyValueStorage | null {
  * Modo local (sem Supabase): dados no localStorage deste navegador.
  * Na primeira abertura usa os dados de demonstração.
  */
-export function createLocalRepository(storage: KeyValueStorage | null = browserStorage()): DataRepository {
+export function createLocalRepository(
+  storage: KeyValueStorage | null = browserStorage(),
+  getActor: () => EventActor | null = () => null
+): DataRepository {
   function read<T>(key: string, fallback: T[]): T[] {
     if (!storage) return fallback;
     try {
@@ -51,6 +63,13 @@ export function createLocalRepository(storage: KeyValueStorage | null = browserS
   const quotes = () => read<Quote>(LOCAL_QUOTES_KEY, INITIAL_QUOTES);
   const clients = () => read<ClientData>(LOCAL_CLIENTS_KEY, INITIAL_CLIENTS);
   const catalog = () => read<CatalogService>(LOCAL_CATALOG_KEY, CATALOG_SERVICES);
+  const events = () => read<QuoteEvent>(LOCAL_EVENTS_KEY, []);
+
+  /** Histórico é complementar: se não couber no navegador, o dado principal já foi salvo. */
+  function logEvents(added: QuoteEvent[]) {
+    if (added.length === 0) return;
+    write(LOCAL_EVENTS_KEY, appendEvents(events(), added));
+  }
 
   return {
     kind: 'local',
@@ -66,17 +85,26 @@ export function createLocalRepository(storage: KeyValueStorage | null = browserS
     async saveQuote(quote) {
       const list = quotes();
       const idx = list.findIndex(q => q.id === quote.id);
-      return write(LOCAL_QUOTES_KEY, idx >= 0 ? list.map((q, i) => (i === idx ? quote : q)) : [quote, ...list]);
+      const res = write(LOCAL_QUOTES_KEY, idx >= 0 ? list.map((q, i) => (i === idx ? quote : q)) : [quote, ...list]);
+      if (res.success) logEvents(eventsForSave(idx >= 0 ? list[idx] : undefined, quote, getActor()));
+      return res;
     },
 
     async deleteQuote(quoteId) {
-      return write(LOCAL_QUOTES_KEY, quotes().filter(q => q.id !== quoteId));
+      const list = quotes();
+      const target = list.find(q => q.id === quoteId);
+      const res = write(LOCAL_QUOTES_KEY, list.filter(q => q.id !== quoteId));
+      if (res.success && target) logEvents([eventForDelete(target, getActor())]);
+      return res;
     },
 
     async clearAllQuotes() {
-      const removed = quotes().length;
+      const list = quotes();
       const res = write(LOCAL_QUOTES_KEY, []);
-      return res.success ? ok(removed) : res;
+      if (!res.success) return res;
+      const actor = getActor();
+      logEvents(list.map(q => eventForDelete(q, actor)));
+      return ok(list.length);
     },
 
     async saveClient(client) {
@@ -95,6 +123,10 @@ export function createLocalRepository(storage: KeyValueStorage | null = browserS
 
     async deleteService(serviceId) {
       return write(LOCAL_CATALOG_KEY, catalog().filter(s => s.id !== serviceId));
+    },
+
+    async fetchQuoteEvents(quoteId) {
+      return ok(eventsOfQuote(events(), quoteId));
     },
   };
 }

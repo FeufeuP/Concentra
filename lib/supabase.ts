@@ -2,6 +2,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Quote, QuoteItem, QuoteStatus, ClientData, CatalogService } from './types';
+import type { QuoteEvent, QuoteEventType } from './quote-events';
 
 // ==============================================================================
 // TIPOS DAS LINHAS DO BANCO (snake_case) E HELPERS
@@ -412,6 +413,97 @@ export async function clearAllQuotesInSupabase(confirmation: string): Promise<Re
     return { success: true, data: Number(data) || 0 };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao zerar orçamentos.') };
+  }
+}
+
+// ==============================================================================
+// HISTÓRICO DE ORÇAMENTOS (quote_events) — somente leitura no app
+// ==============================================================================
+
+export interface QuoteEventRow {
+  id: number | string;
+  quote_id: string;
+  quote_number: number | null;
+  event_type: string;
+  from_status: string | null;
+  to_status: string | null;
+  details: Record<string, unknown> | null;
+  actor_name: string | null;
+  created_at: string;
+}
+
+const EVENT_TYPES: QuoteEventType[] = ['created', 'status_changed', 'email_sent', 'deleted'];
+
+export function rowToQuoteEvent(row: QuoteEventRow): QuoteEvent {
+  return {
+    id: String(row.id),
+    quoteId: normalizeQuoteId(row.quote_id),
+    quoteNumber: row.quote_number ?? undefined,
+    type: (EVENT_TYPES as string[]).includes(row.event_type) ? (row.event_type as QuoteEventType) : 'created',
+    fromStatus: row.from_status ?? undefined,
+    toStatus: row.to_status ?? undefined,
+    details: row.details && typeof row.details === 'object' ? row.details : {},
+    actorName: row.actor_name ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export async function fetchQuoteEventsFromSupabase(quoteId: string): Promise<RemoteResult<QuoteEvent[]>> {
+  const client = getSupabaseClient();
+  if (!client) return notConnected();
+  try {
+    const { data, error } = await client
+      .from('quote_events')
+      .select('*')
+      .eq('quote_id', normalizeQuoteId(quoteId))
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) return { success: false, error: friendlyDbError(error) };
+    return { success: true, data: ((data || []) as QuoteEventRow[]).map(rowToQuoteEvent) };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro ao carregar o histórico.') };
+  }
+}
+
+// ==============================================================================
+// EDGE FUNCTIONS
+// ==============================================================================
+
+/**
+ * Chama uma Edge Function (o token da sessão vai automaticamente) e extrai a
+ * mensagem `{ error }` devolvida pela função, quando houver.
+ */
+export async function invokeEdgeFunction<T = unknown>(
+  name: string,
+  body: Record<string, unknown>
+): Promise<{ data?: T; error?: string; code?: string; status?: number }> {
+  const client = getSupabaseClient();
+  if (!client) return { error: 'Supabase não configurado.' };
+  try {
+    const { data, error } = await client.functions.invoke(name, { body });
+    if (error) {
+      let msg = error.message;
+      let code: string | undefined;
+      let status: number | undefined;
+      const ctx = (error as { context?: unknown }).context;
+      if (ctx instanceof Response) {
+        status = ctx.status;
+        try {
+          const parsed = await ctx.clone().json();
+          if (parsed?.error) msg = parsed.error;
+          if (typeof parsed?.code === 'string') code = parsed.code;
+        } catch {
+          /* resposta sem JSON */
+        }
+      }
+      return { error: msg || 'Erro ao comunicar com o servidor.', code, status };
+    }
+    if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
+      return { error: (data as { error: string }).error };
+    }
+    return { data: data as T };
+  } catch (err) {
+    return { error: getErrorMessage(err, 'Erro ao comunicar com o servidor.') };
   }
 }
 

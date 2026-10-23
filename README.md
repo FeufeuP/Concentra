@@ -22,7 +22,9 @@ relatórios e geração de PDF.
 - **Clientes**: cadastro com CNPJ, IE, grau de risco/CNAE e contato
 - **Catálogo de serviços** SST (PGR, PCMSO, LTCAT, NR-10, NR-35, eSocial…)
 - **Relatórios** mensais com exportação em PDF e CSV (compatível com Excel)
-- Envio por **WhatsApp** e e-mail (o envio de e-mail ainda é simulado)
+- Envio por **WhatsApp** e **e-mail com o PDF anexo** (Resend via Edge Function, ou envio manual pelo app de e-mail)
+- **Histórico do orçamento** (criação, mudanças de status, e-mails enviados, exclusão) gravado pelo servidor
+- **Notificações** de propostas vencendo, vencidas, sem retorno e rascunhos parados, e **status real da conexão**
 - **Configurações**: perfil da empresa, logo, textos da proposta, responsáveis e usuários
 
 ## Stack
@@ -119,6 +121,12 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes e build em cada p
 
    O JWT do usuário é validado dentro da função (`auth.getUser`), e ela só executa as ações se quem
    chama for administrador.
+
+   Publique também a função de envio de propostas por e-mail:
+
+   ```bash
+   npx supabase functions deploy send-quote-email --project-ref <ref-do-projeto> --no-verify-jwt
+   ```
 4. **Authentication → Sign In / Providers**: desative *Allow new users to sign up*.
 5. **Authentication → URL Configuration**: defina o *Site URL* com o domínio de produção e inclua
    em *Redirect URLs* `https://seu-dominio/**` e `http://localhost:3000/**` (link de recuperação de senha).
@@ -133,11 +141,32 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 > A anon key é pública por natureza; a segurança vem das políticas RLS. **Nunca** coloque a
 > `service_role` key em variáveis `NEXT_PUBLIC_*`.
 
+### E-mail das propostas (Resend)
+
+O botão **Enviar por E-mail** usa a Edge Function `send-quote-email` e o serviço
+[Resend](https://resend.com) (plano gratuito: 3.000 e-mails/mês).
+
+1. Crie a conta no Resend e, em **Domains**, adicione e verifique o domínio da empresa (registros DNS
+   SPF/DKIM). Sem domínio verificado, o Resend só envia para o e-mail do dono da conta.
+2. Em **API Keys**, crie uma chave com permissão *Sending access*.
+3. No Supabase: **Edge Functions → Secrets**, adicione:
+
+   | Segredo | Exemplo |
+   |---|---|
+   | `RESEND_API_KEY` | `re_xxxxxxxx` |
+   | `EMAIL_FROM` | `Consentra SST <propostas@seudominio.com.br>` |
+
+O PDF é gerado no navegador e enviado como anexo (até 8 MB). As respostas do cliente vão para o
+e-mail de quem enviou (*reply-to*). O envio fica no histórico do orçamento. **Sem esses segredos (ou
+no modo local), o sistema faz o envio manual:** baixa o PDF e abre o aplicativo de e-mail com
+destinatários, assunto e mensagem preenchidos.
+
 > **Banco criado antes da Fase 3?** Execute [`supabase/upgrade_fase3.sql`](./supabase/upgrade_fase3.sql)
-> (idempotente). O `schema.sql` já contém tudo para instalações novas.
+> (idempotente) e depois [`supabase/upgrade_fase5.sql`](./supabase/upgrade_fase5.sql) (histórico).
+> **Criado na Fase 3 ou 4?** Execute só o `upgrade_fase5.sql`. O `schema.sql` já contém tudo para instalações novas.
 
 **Tabelas:** `profiles` (ligada a `auth.users`), `clients`, `catalog_services`, `quotes`,
-`quote_items`, `app_settings`. **Storage:** bucket público `branding` (logotipo; escrita só admin).
+`quote_items`, `app_settings`, `quote_events` (histórico, gravado só pelo servidor). **Storage:** bucket público `branding` (logotipo; escrita só admin).
 
 **Como os dados são gravados (modo Supabase):**
 
@@ -149,6 +178,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 | Clientes e catálogo de serviços | `clients`, `catalog_services` | todos, exceto Auditor SST |
 | Dados da empresa, textos do PDF e logotipo | `app_settings` (`company_profile`, `quote_texts`, `logo_url`) + Storage | só administradores |
 | Responsáveis pelo orçamento | `app_settings.responsible_persons` | todos, exceto Auditor SST |
+| Histórico do orçamento | `quote_events`: trigger em `quotes` (criação, status, exclusão) + Edge Function de e-mail | ninguém (somente leitura) |
 
 O banco é a fonte da verdade: ao entrar, o app carrega tudo do servidor e não guarda orçamentos ou
 clientes no navegador. Toda gravação é confirmada pelo servidor; se falhar (sem permissão, sem
@@ -170,7 +200,7 @@ app/                    layout (providers globais) e página: valida a sessão �
 components/
   Workspace.tsx         área autenticada: abas, orçamento em edição e modais
   *View.tsx             telas (Dashboard, Orçamentos, Novo Orçamento, PDF, Clientes, Serviços, Relatórios, Configurações)
-  settings/ services/ dashboard/ quote/   partes extraídas das telas grandes
+  settings/ services/ dashboard/ quote/ header/   partes extraídas das telas (inclui histórico e notificações)
   ui/                   Toast, diálogo de confirmação e logotipo (BrandLogo)
   providers/            AppProviders (Toast + diálogos)
 lib/
@@ -178,11 +208,15 @@ lib/
   repository/           camada de dados única: local (localStorage) × Supabase + regra de numeração
   quote-calc.ts         cálculo de itens, subtotal, desconto e parcelas
   dashboard-metrics.ts  filtros e indicadores do dashboard
+  notifications.ts      notificações calculadas dos orçamentos
+  quote-events.ts       histórico (eventos) dos orçamentos
+  email.ts              envio de e-mail (Edge Function) e envio manual (mailto)
+  connection-status.ts  verificação real da conexão com o servidor
   supabase.ts auth.ts   acesso ao Supabase e autenticação
   pdf-generator.ts …    PDF, máscaras, tipos, dados padrão, configurações
 tests/                  testes Vitest
 public/                 logo e favicons
-supabase/               schema SQL (+ upgrade_fase3.sql), políticas RLS, seed de usuários e Edge Function admin-users
+supabase/               schema SQL (+ upgrades das fases 3 e 5), políticas RLS, seed de usuários e Edge Functions (admin-users, send-quote-email)
 ```
 
 ### Arquitetura

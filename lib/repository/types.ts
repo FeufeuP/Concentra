@@ -1,5 +1,6 @@
 import type { Quote, ClientData, CatalogService } from '../types';
 import type { RemoteResult } from '../supabase';
+import type { QuoteEvent } from '../quote-events';
 
 export type RepoResult<T = void> = RemoteResult<T>;
 
@@ -40,4 +41,7 @@ export interface DataRepository {
 
   saveService(service: CatalogService): Promise<RepoResult>;
   deleteService(serviceId: string): Promise<RepoResult>;
+
+  /** Histórico do orçamento (mais recente primeiro). */
+  fetchQuoteEvents(quoteId: string): Promise<RepoResult<QuoteEvent[]>>;
 }

@@ -404,6 +404,21 @@ export async function generateQuotePdfDoc(quote: Quote): Promise<jsPDF> {
 }
 
 /**
+ * Gera o PDF da proposta como anexo de e-mail (base64, sem o prefixo data:).
+ */
+export async function generateQuotePdfAttachment(quote: Quote): Promise<{ filename: string; content: string; bytes: number }> {
+  const doc = await generateQuotePdfDoc(quote);
+  const dataUri = doc.output('datauristring');
+  const content = dataUri.slice(dataUri.indexOf(',') + 1);
+  const padding = content.endsWith('==') ? 2 : content.endsWith('=') ? 1 : 0;
+  return {
+    filename: quotePdfFileName(quote),
+    content,
+    bytes: Math.floor((content.length * 3) / 4) - padding,
+  };
+}
+
+/**
  * Gera e realiza o download direto do PDF da Proposta Comercial & Técnica de SST
  * utilizando html2pdf.js para 100% de fidelidade visual ao layout exibido na tela
  */
