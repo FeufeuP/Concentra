@@ -1,26 +1,49 @@
 -- ==============================================================================
--- CONSENTRA SST - SUPABASE POSTGRESQL SCHEMA & MIGRATION SCRIPT
+-- CONSENTRA SST - SUPABASE POSTGRESQL SCHEMA (v2 - Fase 2: Segurança)
 -- ==============================================================================
--- Instruções de Execução no Supabase:
--- 1. Acesse o seu projeto no Supabase (https://supabase.com/dashboard)
--- 2. No menu lateral, clique em "SQL Editor"
--- 3. Clique em "+ New query"
--- 4. Cole o conteúdo integral deste arquivo e clique no botão "Run" (Executar)
+-- Instruções:
+-- 1. Supabase Dashboard > SQL Editor > New query
+-- 2. Cole este arquivo inteiro e clique em "Run"
+-- 3. Em seguida execute `supabase/seed_users.sql` para cadastrar os usuários iniciais
+-- 4. Publique a Edge Function `supabase/functions/admin-users` (gestão de usuários)
+--
+-- Modelo de segurança:
+-- * Login via Supabase Auth (senhas com bcrypt, nunca em texto puro).
+-- * `public.profiles` guarda os dados de perfil (1:1 com auth.users), SEM senha.
+-- * RLS: nada é acessível sem login (role `anon`).
+--   - Usuários autenticados leem todos os dados de trabalho.
+--   - Escrita liberada para todos os perfis, exceto "Auditor SST" (somente leitura).
+--   - Configurações gerais e gestão de usuários: somente administradores.
+-- * Script idempotente: pode ser executado novamente para atualizar um banco
+--   criado com a versão antiga (remove a tabela `users` com senhas em texto puro
+--   e as políticas abertas para `anon`).
 -- ==============================================================================
 
--- Habilita extensão pgcrypto para UUIDs se necessário
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
 
 -- ==============================================================================
--- 1. TABELA DE USUÁRIOS E OPERADORES DO SISTEMA (users)
+-- 0. LIMPEZA DA VERSÃO ANTIGA (INSEGURA)
 -- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.users (
-    id TEXT PRIMARY KEY,
+-- Tabela antiga com senhas em texto puro e acesso público
+DROP TABLE IF EXISTS public.users CASCADE;
+
+-- ==============================================================================
+-- 1. PERFIS DE USUÁRIO (profiles) - vinculados ao Supabase Auth
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    legacy_id TEXT UNIQUE,              -- id usado na versão local (ex.: 'user-washington')
     name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Responsável Técnico',
-    initials TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    role TEXT NOT NULL DEFAULT 'Responsável Técnico'
+        CHECK (role IN (
+            'Administrador',
+            'Responsável Técnico',
+            'Responsável Técnico e Administrador',
+            'Comercial',
+            'Auditor SST'
+        )),
+    initials TEXT NOT NULL DEFAULT 'US',
     avatar_bg TEXT DEFAULT 'bg-[#004328]',
     document_registration TEXT,
     phone TEXT,
@@ -29,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 -- ==============================================================================
--- 2. TABELA DE CLIENTES (clients)
+-- 2. CLIENTES (clients)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.clients (
     id TEXT PRIMARY KEY,
@@ -48,7 +71,7 @@ CREATE TABLE IF NOT EXISTS public.clients (
 );
 
 -- ==============================================================================
--- 3. TABELA DO CATÁLOGO DE SERVIÇOS SST (catalog_services)
+-- 3. CATÁLOGO DE SERVIÇOS SST (catalog_services)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.catalog_services (
     id TEXT PRIMARY KEY,
@@ -68,10 +91,10 @@ CREATE TABLE IF NOT EXISTS public.catalog_services (
 );
 
 -- ==============================================================================
--- 4. TABELA PRINCIPAL DE PROPOSTAS E ORÇAMENTOS (quotes)
+-- 4. PROPOSTAS E ORÇAMENTOS (quotes)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.quotes (
-    id TEXT PRIMARY KEY, -- e.g. '#319'
+    id TEXT PRIMARY KEY,
     number_only INTEGER NOT NULL,
     client_id TEXT NOT NULL,
     client_name TEXT NOT NULL,
@@ -107,7 +130,7 @@ CREATE TABLE IF NOT EXISTS public.quotes (
 );
 
 -- ==============================================================================
--- 5. ITENS DETALHADOS DO ORÇAMENTO (quote_items)
+-- 5. ITENS DO ORÇAMENTO (quote_items)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.quote_items (
     id TEXT PRIMARY KEY,
@@ -123,7 +146,7 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
 );
 
 -- ==============================================================================
--- 6. CONFIGURAÇÕES GERAIS E PERFIL DA EMPRESA (app_settings)
+-- 6. CONFIGURAÇÕES GERAIS (app_settings)
 -- ==============================================================================
 CREATE TABLE IF NOT EXISTS public.app_settings (
     key TEXT PRIMARY KEY,
@@ -132,9 +155,10 @@ CREATE TABLE IF NOT EXISTS public.app_settings (
 );
 
 -- ==============================================================================
--- ÍNDICES DE DESEMPENHO
+-- ÍNDICES
 -- ==============================================================================
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(lower(email));
+CREATE INDEX IF NOT EXISTS idx_profiles_name ON public.profiles(lower(name));
 CREATE INDEX IF NOT EXISTS idx_quotes_client_id ON public.quotes(client_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_status ON public.quotes(status);
 CREATE INDEX IF NOT EXISTS idx_quotes_created_at ON public.quotes(created_at DESC);
@@ -142,59 +166,102 @@ CREATE INDEX IF NOT EXISTS idx_quote_items_quote_id ON public.quote_items(quote_
 CREATE INDEX IF NOT EXISTS idx_catalog_services_nr ON public.catalog_services(nr_category);
 
 -- ==============================================================================
--- ATIVAR ROW LEVEL SECURITY (RLS) E POLÍTICAS DE ACESSO
--- Permite leitura e escrita pelo cliente Supabase anônimo (anon key) e autenticado
+-- FUNÇÕES DE APOIO (papel do usuário logado)
+-- SECURITY DEFINER evita recursão de RLS ao consultar `profiles` dentro das políticas.
 -- ==============================================================================
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.catalog_services ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION public.current_app_role()
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT role FROM public.profiles WHERE id = auth.uid();
+$$;
 
--- Políticas para users
-DROP POLICY IF EXISTS "Anon & Authenticated full access to users" ON public.users;
-CREATE POLICY "Anon & Authenticated full access to users" ON public.users
-    FOR ALL USING (true) WITH CHECK (true);
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE(
+        (SELECT role IN ('Administrador', 'Responsável Técnico e Administrador')
+           FROM public.profiles WHERE id = auth.uid()),
+        false
+    );
+$$;
 
--- Políticas para clients
-DROP POLICY IF EXISTS "Anon & Authenticated full access to clients" ON public.clients;
-CREATE POLICY "Anon & Authenticated full access to clients" ON public.clients
-    FOR ALL USING (true) WITH CHECK (true);
+CREATE OR REPLACE FUNCTION public.can_write()
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE(
+        (SELECT role <> 'Auditor SST' FROM public.profiles WHERE id = auth.uid()),
+        false
+    );
+$$;
 
--- Políticas para catalog_services
-DROP POLICY IF EXISTS "Anon & Authenticated full access to catalog_services" ON public.catalog_services;
-CREATE POLICY "Anon & Authenticated full access to catalog_services" ON public.catalog_services
-    FOR ALL USING (true) WITH CHECK (true);
+REVOKE ALL ON FUNCTION public.current_app_role() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.is_admin() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.can_write() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.current_app_role() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.can_write() TO authenticated;
 
--- Políticas para quotes
-DROP POLICY IF EXISTS "Anon & Authenticated full access to quotes" ON public.quotes;
-CREATE POLICY "Anon & Authenticated full access to quotes" ON public.quotes
-    FOR ALL USING (true) WITH CHECK (true);
+-- ------------------------------------------------------------------------------
+-- Login por nome: resolve "Washington Assis" -> e-mail cadastrado.
+-- Somente correspondência exata (sem diferenciar maiúsculas); nunca expõe senha.
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.resolve_login_email(identifier TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+-- Aceita: e-mail; nome completo; prefixo do e-mail (ex.: "admin");
+-- ou uma palavra do nome, desde que identifique um único usuário (ex.: "amanda").
+DECLARE
+    q TEXT := lower(trim(coalesce(identifier, '')));
+    v TEXT;
+    n INT;
+BEGIN
+    IF q = '' THEN RETURN NULL; END IF;
+    IF position('@' IN q) > 0 THEN RETURN q; END IF;
 
--- Políticas para quote_items
-DROP POLICY IF EXISTS "Anon & Authenticated full access to quote_items" ON public.quote_items;
-CREATE POLICY "Anon & Authenticated full access to quote_items" ON public.quote_items
-    FOR ALL USING (true) WITH CHECK (true);
+    SELECT email INTO v FROM public.profiles WHERE lower(name) = q ORDER BY created_at LIMIT 1;
+    IF v IS NOT NULL THEN RETURN v; END IF;
 
--- Políticas para app_settings
-DROP POLICY IF EXISTS "Anon & Authenticated full access to app_settings" ON public.app_settings;
-CREATE POLICY "Anon & Authenticated full access to app_settings" ON public.app_settings
-    FOR ALL USING (true) WITH CHECK (true);
+    SELECT email INTO v FROM public.profiles WHERE split_part(lower(email), '@', 1) = q ORDER BY created_at LIMIT 1;
+    IF v IS NOT NULL THEN RETURN v; END IF;
+
+    IF length(q) >= 3 THEN
+        SELECT count(*), min(email) INTO n, v
+          FROM public.profiles
+         WHERE position(' ' || q || ' ' IN ' ' || regexp_replace(lower(name), '[^[:alnum:]]+', ' ', 'g') || ' ') > 0;
+        IF n = 1 THEN RETURN v; END IF;
+    END IF;
+
+    RETURN NULL;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.resolve_login_email(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.resolve_login_email(TEXT) TO anon, authenticated;
 
 -- ==============================================================================
--- TRIGGER PARA ATUALIZAÇÃO AUTOMÁTICA DE updated_at
+-- TRIGGERS
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-DROP TRIGGER IF EXISTS tr_users_updated_at ON public.users;
-CREATE TRIGGER tr_users_updated_at BEFORE UPDATE ON public.users
+DROP TRIGGER IF EXISTS tr_profiles_updated_at ON public.profiles;
+CREATE TRIGGER tr_profiles_updated_at BEFORE UPDATE ON public.profiles
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
 DROP TRIGGER IF EXISTS tr_clients_updated_at ON public.clients;
@@ -209,22 +276,150 @@ DROP TRIGGER IF EXISTS tr_catalog_services_updated_at ON public.catalog_services
 CREATE TRIGGER tr_catalog_services_updated_at BEFORE UPDATE ON public.catalog_services
     FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- ==============================================================================
--- CARGA INICIAL DE DADOS (SEEDS)
--- ==============================================================================
+DROP TRIGGER IF EXISTS tr_app_settings_updated_at ON public.app_settings;
+CREATE TRIGGER tr_app_settings_updated_at BEFORE UPDATE ON public.app_settings
+    FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
--- 1. Usuários Padrão
-INSERT INTO public.users (id, name, email, password, role, initials, avatar_bg, document_registration, phone)
-VALUES 
-    ('user_washington', 'Washington Assis', 'assis.sul@gmail.com', '123', 'Responsável Técnico e Administrador', 'WA', 'bg-[#004328]', 'CREA-SP 506.892/D', '(11) 98765-4321'),
-    ('user_mariana', 'Mariana Souza', 'mariana.souza@consentra.com.br', '123', 'Comercial', 'MS', 'bg-blue-700', 'MTE 004821/SP', '(11) 97123-8890'),
-    ('user_roberto', 'Dr. Roberto Almeida', 'roberto.almeida@consentra.com.br', '123', 'Responsável Técnico', 'RA', 'bg-emerald-700', 'CRM-SP 142.500', '(11) 99887-1122')
-ON CONFLICT (email) DO UPDATE SET 
-    name = EXCLUDED.name,
-    role = EXCLUDED.role,
-    document_registration = EXCLUDED.document_registration;
+-- ------------------------------------------------------------------------------
+-- Cria o perfil automaticamente quando um usuário é criado no Supabase Auth.
+-- O papel (role) vem de app_metadata, que só pode ser definido com a service role
+-- (Edge Function admin-users / seed). Dados livres vêm de user_metadata.
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_name TEXT := COALESCE(NULLIF(NEW.raw_user_meta_data->>'name', ''), split_part(NEW.email, '@', 1));
+    v_role TEXT := COALESCE(NULLIF(NEW.raw_app_meta_data->>'role', ''), 'Responsável Técnico');
+BEGIN
+    IF v_role NOT IN ('Administrador', 'Responsável Técnico', 'Responsável Técnico e Administrador', 'Comercial', 'Auditor SST') THEN
+        v_role := 'Responsável Técnico';
+    END IF;
 
--- 2. Catálogo de Serviços SST
+    INSERT INTO public.profiles (id, legacy_id, name, email, role, initials, avatar_bg, document_registration, phone)
+    VALUES (
+        NEW.id,
+        NULLIF(NEW.raw_user_meta_data->>'legacy_id', ''),
+        v_name,
+        lower(NEW.email),
+        v_role,
+        COALESCE(NULLIF(NEW.raw_user_meta_data->>'initials', ''), upper(left(v_name, 2))),
+        COALESCE(NULLIF(NEW.raw_user_meta_data->>'avatar_bg', ''), 'bg-[#004328]'),
+        NULLIF(NEW.raw_user_meta_data->>'document_registration', ''),
+        NULLIF(NEW.raw_user_meta_data->>'phone', '')
+    )
+    ON CONFLICT (id) DO NOTHING;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- ------------------------------------------------------------------------------
+-- Impede escalada de privilégio: só administradores alteram papel, e-mail ou
+-- legacy_id de um perfil. (A service role ignora esta regra.)
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.protect_profile_fields()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    IF auth.uid() IS NULL THEN
+        -- Chamada sem usuário (service role / SQL Editor): permitido
+        RETURN NEW;
+    END IF;
+
+    IF NOT public.is_admin() AND (
+        NEW.role IS DISTINCT FROM OLD.role OR
+        NEW.email IS DISTINCT FROM OLD.email OR
+        NEW.legacy_id IS DISTINCT FROM OLD.legacy_id
+    ) THEN
+        RAISE EXCEPTION 'Apenas administradores podem alterar perfil de acesso, e-mail ou identificador.'
+            USING ERRCODE = '42501';
+    END IF;
+
+    NEW.id := OLD.id;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tr_profiles_protect ON public.profiles;
+CREATE TRIGGER tr_profiles_protect BEFORE UPDATE ON public.profiles
+    FOR EACH ROW EXECUTE FUNCTION public.protect_profile_fields();
+
+-- ==============================================================================
+-- ROW LEVEL SECURITY
+-- ==============================================================================
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.catalog_services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+
+-- Remove as políticas antigas (versão insegura) que liberavam tudo para anon
+DROP POLICY IF EXISTS "Anon & Authenticated full access to clients" ON public.clients;
+DROP POLICY IF EXISTS "Anon & Authenticated full access to catalog_services" ON public.catalog_services;
+DROP POLICY IF EXISTS "Anon & Authenticated full access to quotes" ON public.quotes;
+DROP POLICY IF EXISTS "Anon & Authenticated full access to quote_items" ON public.quote_items;
+DROP POLICY IF EXISTS "Anon & Authenticated full access to app_settings" ON public.app_settings;
+
+-- Nenhum acesso para visitantes não autenticados
+REVOKE ALL ON public.profiles, public.clients, public.catalog_services,
+              public.quotes, public.quote_items, public.app_settings FROM anon;
+
+-- ---------- profiles ----------
+DROP POLICY IF EXISTS "profiles_select_authenticated" ON public.profiles;
+CREATE POLICY "profiles_select_authenticated" ON public.profiles
+    FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "profiles_update_self_or_admin" ON public.profiles;
+CREATE POLICY "profiles_update_self_or_admin" ON public.profiles
+    FOR UPDATE TO authenticated
+    USING (id = auth.uid() OR public.is_admin())
+    WITH CHECK (id = auth.uid() OR public.is_admin());
+-- INSERT / DELETE de perfis: somente via trigger do Auth e Edge Function (service role)
+
+-- ---------- tabelas de trabalho (clients, catalog_services, quotes, quote_items) ----------
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOREACH t IN ARRAY ARRAY['clients', 'catalog_services', 'quotes', 'quote_items'] LOOP
+        EXECUTE format('DROP POLICY IF EXISTS "%1$s_select_authenticated" ON public.%1$I', t);
+        EXECUTE format('CREATE POLICY "%1$s_select_authenticated" ON public.%1$I FOR SELECT TO authenticated USING (true)', t);
+
+        EXECUTE format('DROP POLICY IF EXISTS "%1$s_insert_writers" ON public.%1$I', t);
+        EXECUTE format('CREATE POLICY "%1$s_insert_writers" ON public.%1$I FOR INSERT TO authenticated WITH CHECK (public.can_write())', t);
+
+        EXECUTE format('DROP POLICY IF EXISTS "%1$s_update_writers" ON public.%1$I', t);
+        EXECUTE format('CREATE POLICY "%1$s_update_writers" ON public.%1$I FOR UPDATE TO authenticated USING (public.can_write()) WITH CHECK (public.can_write())', t);
+
+        EXECUTE format('DROP POLICY IF EXISTS "%1$s_delete_writers" ON public.%1$I', t);
+        EXECUTE format('CREATE POLICY "%1$s_delete_writers" ON public.%1$I FOR DELETE TO authenticated USING (public.can_write())', t);
+    END LOOP;
+END $$;
+
+-- ---------- app_settings ----------
+DROP POLICY IF EXISTS "app_settings_select_authenticated" ON public.app_settings;
+CREATE POLICY "app_settings_select_authenticated" ON public.app_settings
+    FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "app_settings_write_admin" ON public.app_settings;
+CREATE POLICY "app_settings_write_admin" ON public.app_settings
+    FOR ALL TO authenticated
+    USING (public.is_admin())
+    WITH CHECK (public.is_admin());
+
+-- ==============================================================================
+-- CARGA INICIAL (catálogo e configurações)
+-- Usuários: ver `supabase/seed_users.sql`
+-- ==============================================================================
 INSERT INTO public.catalog_services (id, code, title, subtitle, description, unit, suggested_price, nr_category, category, status, deliverables, quick_select)
 VALUES
     ('serv-pgr', 'PGR-01', 'Elaboração de PGR (NR-01)', 'Programa de Gerenciamento de Riscos', 'Inventário de Riscos Ocupacionais (GRO) e Plano de Ação em consonância com as NRs atualizadas.', 'documento', 1400.00, 'NR-01', 'Programas Legais', 'Ativo', ARRAY['Inventário de Riscos', 'Plano de Ação', 'Matriz de Risco AIHA/BS8800', 'Assinatura com ART/CREA'], true),
@@ -237,24 +432,11 @@ VALUES
     ('serv-esocial', 'ESO-01', 'Gestão e Envio de Eventos eSocial SST', 'Eventos S-2210, S-2220 e S-2240', 'Gestão mensal de mensageria direta para o portal governamental com validação de XML.', 'mensal', 450.00, 'eSocial', 'Gestão Contínua', 'Ativo', ARRAY['Envio XML autenticado', 'Relatório de recibos do governo', 'Suporte a inconsistências'], true)
 ON CONFLICT (id) DO NOTHING;
 
--- 3. Configurações da Empresa
 INSERT INTO public.app_settings (key, value)
 VALUES
-    ('company_profile', '{
-        "name": "Consentra Engenharia & Segurança do Trabalho",
-        "cnpj": "12.345.678/0001-99",
-        "crea": "CREA-SP 2049182",
-        "address": "Av. Paulista, 1000 - Bela Vista, São Paulo - SP, 01310-100",
-        "phone": "(11) 3456-7890",
-        "email": "comercial@consentra.com.br",
-        "website": "www.consentra.com.br",
-        "quoteValidityDays": 15,
-        "defaultExecutionForecast": "15 a 20 dias úteis",
-        "defaultPaymentCondition": "Faturado em 3x (30/60/90 dias)"
-    }'::jsonb),
-    ('responsible_persons', '["Washington Assis", "Mariana Souza", "Roberto Almeida", "Ana Beatriz Costa", "Eng. Gabriel Freitas"]'::jsonb)
+    ('responsible_persons', '["Washington Assis", "Dra. Mariana Rios", "Tec. Roberto Silva", "Amanda Silveira", "Gabriel Santana"]'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
 -- ==============================================================================
--- FIM DO SCRIPT DE CRIAÇÃO E MIGRAÇÃO
+-- FIM
 -- ==============================================================================

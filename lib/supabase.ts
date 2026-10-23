@@ -2,7 +2,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Quote, QuoteItem, QuoteStatus, ClientData } from './types';
-import { AuthUser } from './auth';
 
 // ==============================================================================
 // TIPOS DAS LINHAS DO BANCO (snake_case) E HELPERS
@@ -58,18 +57,6 @@ interface ClientRow {
   address: string;
 }
 
-interface UserRow {
-  id: string;
-  name: string;
-  email: string;
-  role: AuthUser['role'];
-  password: string;
-  initials: string;
-  avatar_bg: string | null;
-  document_registration: string | null;
-  phone: string | null;
-}
-
 function getErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === 'object' && err !== null && 'message' in err) {
@@ -79,33 +66,16 @@ function getErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// Storage keys for runtime client overrides if needed
-const STORAGE_URL_KEY = 'consentra_supabase_url';
-const STORAGE_ANON_KEY = 'consentra_supabase_anon_key';
-
-export function getSupabaseCredentials(): { url: string; anonKey: string; source: 'env' | 'localStorage' | 'none' } {
-  // Check env vars first (supports both VITE_ and NEXT_PUBLIC_)
-  const envUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  const envKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-  if (envUrl && envKey && !envUrl.includes('SUA_URL_DO_SUPABASE') && !envKey.includes('SUA_CHAVE_ANON')) {
-    return { url: envUrl.trim(), anonKey: envKey.trim(), source: 'env' };
+// Credenciais públicas do projeto (URL + chave anon/publishable).
+// Vêm SOMENTE de variáveis de ambiente — nunca do localStorage, para que ninguém
+// consiga apontar o app para um banco de terceiros pelo navegador.
+export function getSupabaseCredentials(): { url: string; anonKey: string; source: 'env' | 'none' } {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
+  if (url && anonKey && !url.includes('SUA_URL_DO_SUPABASE') && !anonKey.includes('SUA_CHAVE_ANON')) {
+    return { url, anonKey, source: 'env' };
   }
-
-  // Check localStorage if in browser
-  if (typeof window !== 'undefined') {
-    try {
-      const storedUrl = localStorage.getItem(STORAGE_URL_KEY);
-      const storedKey = localStorage.getItem(STORAGE_ANON_KEY);
-      if (storedUrl && storedKey) {
-        return { url: storedUrl.trim(), anonKey: storedKey.trim(), source: 'localStorage' };
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return { url: envUrl.trim(), anonKey: envKey.trim(), source: 'none' };
+  return { url, anonKey, source: 'none' };
 }
 
 export function isSupabaseConfigured(): boolean {
@@ -139,6 +109,9 @@ export function getSupabaseClient(): SupabaseClient | null {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        // Link de recuperação de senha chega com o token no hash da URL
+        detectSessionInUrl: true,
+        flowType: 'implicit',
       },
     });
     lastUsedUrl = url;
@@ -147,52 +120,6 @@ export function getSupabaseClient(): SupabaseClient | null {
   } catch (err) {
     console.error('Erro ao inicializar cliente Supabase:', err);
     return null;
-  }
-}
-
-export function saveCustomSupabaseCredentials(url: string, anonKey: string): void {
-  if (typeof window !== 'undefined') {
-    if (url && anonKey) {
-      localStorage.setItem(STORAGE_URL_KEY, url.trim());
-      localStorage.setItem(STORAGE_ANON_KEY, anonKey.trim());
-    } else {
-      localStorage.removeItem(STORAGE_URL_KEY);
-      localStorage.removeItem(STORAGE_ANON_KEY);
-    }
-    cachedClient = null;
-    lastUsedUrl = '';
-    lastUsedKey = '';
-  }
-}
-
-export async function testSupabaseConnection(): Promise<{ success: boolean; message: string; details?: string }> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return {
-      success: false,
-      message: 'Supabase não configurado. Forneça VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY válidas no .env ou nas Configurações.',
-    };
-  }
-
-  try {
-    const { data, error } = await client.from('users').select('id, name').limit(1);
-    if (error) {
-      return {
-        success: false,
-        message: `Falha na consulta ao Supabase: ${error.message}`,
-        details: error.details || error.hint || undefined,
-      };
-    }
-
-    return {
-      success: true,
-      message: `Conexão estabelecida com sucesso com o PostgreSQL do Supabase! (${data?.length ?? 0} registros consultados na tabela users).`,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: `Erro ao conectar: ${getErrorMessage(err, 'Falha de rede ou CORS')}`,
-    };
   }
 }
 
@@ -456,112 +383,5 @@ export async function deleteClientFromSupabase(clientId: string): Promise<{ succ
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao excluir cliente') };
-  }
-}
-
-// ==============================================================================
-// USUÁRIOS (USERS)
-// ==============================================================================
-
-export async function fetchUsersFromSupabase(): Promise<AuthUser[] | null> {
-  const client = getSupabaseClient();
-  if (!client) return null;
-
-  try {
-    const { data, error } = await client
-      .from('users')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error || !data) return null;
-
-    return (data as UserRow[]).map((u): AuthUser => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      password: u.password,
-      initials: u.initials,
-      avatarBg: u.avatar_bg || 'bg-[#004328]',
-      documentRegistration: u.document_registration || undefined,
-      phone: u.phone || undefined,
-    }));
-  } catch {
-    return null;
-  }
-}
-
-export async function saveUserToSupabase(u: AuthUser): Promise<{ success: boolean; error?: string }> {
-  const client = getSupabaseClient();
-  if (!client) return { success: false, error: 'Supabase não conectado' };
-
-  try {
-    const payload = {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      password: u.password || '123',
-      role: u.role,
-      initials: u.initials,
-      avatar_bg: u.avatarBg || 'bg-[#004328]',
-      document_registration: u.documentRegistration || null,
-      phone: u.phone || null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await client.from('users').upsert(payload, { onConflict: 'id' });
-    if (error) return { success: false, error: error.message };
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: getErrorMessage(err, 'Erro ao salvar usuário') };
-  }
-}
-
-// ==============================================================================
-// SINCRONIZAÇÃO COMPLETA LOCAL -> SUPABASE
-// ==============================================================================
-
-export async function syncAllLocalDataToSupabase(
-  quotes: Quote[],
-  clients: ClientData[],
-  users: AuthUser[]
-): Promise<{ success: boolean; message: string }> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return { success: false, message: 'Supabase não configurado. Verifique as credenciais no .env.' };
-  }
-
-  try {
-    let clientsCount = 0;
-    let quotesCount = 0;
-    let usersCount = 0;
-
-    // 1. Sync users
-    for (const u of users) {
-      await saveUserToSupabase(u);
-      usersCount++;
-    }
-
-    // 2. Sync clients
-    for (const c of clients) {
-      await saveClientToSupabase(c);
-      clientsCount++;
-    }
-
-    // 3. Sync quotes
-    for (const q of quotes) {
-      await saveQuoteToSupabase(q);
-      quotesCount++;
-    }
-
-    return {
-      success: true,
-      message: `Sincronização concluída com sucesso! ${quotesCount} orçamentos, ${clientsCount} clientes e ${usersCount} operadores enviados ao Supabase PostgreSQL.`,
-    };
-  } catch (err) {
-    return {
-      success: false,
-      message: `Erro durante a sincronização: ${getErrorMessage(err, 'Falha de comunicação')}`,
-    };
   }
 }

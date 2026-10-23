@@ -5,7 +5,7 @@ import { COMPANY_PROFILE, DIRECT_LOGO_URL } from '@/lib/mock-data';
 import { getStoredCompanyProfile, saveStoredCompanyProfile, CompanyProfile } from '@/lib/company';
 import { getStoredResponsibles, saveStoredResponsibles, DEFAULT_RESPONSIBLES } from '@/lib/responsibles';
 import { getStoredLogoUrl, saveStoredLogoUrl, clearStoredLogoUrl, DEFAULT_REAL_LOGO_URL, DEFAULT_LOGO_URL } from '@/lib/logo';
-import { AuthUser, getStoredUsers, saveStoredUsers, registerNewUser, changeUserPassword, getCurrentUser, updateUser, isAdminUser } from '@/lib/auth';
+import { AuthUser, UserRole, USER_ROLES, listUsers, createUserAccount, adminResetPassword, deleteUserAccount, getCurrentUser, isAdminUser, MIN_PASSWORD_LENGTH } from '@/lib/auth';
 import { Quote, ClientData } from '@/lib/types';
 import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -108,16 +108,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [savedSection, setSavedSection] = useState<string | null>(null);
 
   // Usuários e Senhas de Acesso (Seção 5)
-  const [usersList, setUsersList] = useState<AuthUser[]>(() => getStoredUsers());
+  const [usersList, setUsersList] = useState<AuthUser[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
-  const [newUserPass, setNewUserPass] = useState('123');
-  const [newUserRole, setNewUserRole] = useState<'Responsável Técnico' | 'Responsável Técnico e Administrador' | 'Comercial' | 'Administrador'>('Responsável Técnico');
+  const [newUserPass, setNewUserPass] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('Responsável Técnico');
   const [newUserDoc, setNewUserDoc] = useState('');
   const [userSuccessMsg, setUserSuccessMsg] = useState<string | null>(null);
   const [userErrorMsg, setUserErrorMsg] = useState<string | null>(null);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
-  const [resetPassValue, setResetPassValue] = useState('123');
+  const [resetPassValue, setResetPassValue] = useState('');
   const [isResettingPass, setIsResettingPass] = useState<boolean>(false);
   const [resetPassProgress, setResetPassProgress] = useState<number>(0);
 
@@ -136,6 +136,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const activeUser = currentUser || (typeof window !== 'undefined' ? getCurrentUser() : null);
   const isAdmin = isAdminUser(activeUser);
+
+  const refreshUsers = async () => {
+    setUsersList(await listUsers());
+  };
+
+  useEffect(() => {
+    let alive = true;
+    listUsers().then((users) => {
+      if (alive) setUsersList(users);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const flashUserMsg = (type: 'success' | 'error', msg: string) => {
+    if (type === 'success') {
+      setUserSuccessMsg(msg);
+      setTimeout(() => setUserSuccessMsg(null), 3500);
+    } else {
+      setUserErrorMsg(msg);
+      setTimeout(() => setUserErrorMsg(null), 5000);
+    }
+  };
 
   // Responsáveis pelo Orçamento (apenas nome)
   const [responsibles, setResponsibles] = useState<string[]>(() => {
@@ -272,26 +296,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    setUserSuccessMsg(null);
-    setUserErrorMsg(null);
-
-    const res = registerNewUser(newUserName, newUserEmail, newUserPass, newUserRole, newUserDoc);
-    if (res.success && res.user) {
-      setUsersList(getStoredUsers());
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserPass('123');
-      setNewUserDoc('');
-      setUserSuccessMsg(`Usuário ${res.user.name} cadastrado com sucesso!`);
-      setTimeout(() => setUserSuccessMsg(null), 3500);
-    } else {
-      setUserErrorMsg(res.error || 'Erro ao cadastrar usuário.');
-      setTimeout(() => setUserErrorMsg(null), 3500);
-    }
-  };
-
   const triggerSectionSave = (sectionId: string, action: () => void, successMsg: string) => {
     setSavingSection(sectionId);
     setSavingProgress(25);
@@ -340,7 +344,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }, '4. Lista de Responsáveis pelo Orçamento salva com sucesso!');
   };
 
-  const handleCreateUserWithProgress = (e: React.FormEvent) => {
+  const handleCreateUserWithProgress = async (e: React.FormEvent) => {
     e.preventDefault();
     setUserSuccessMsg(null);
     setUserErrorMsg(null);
@@ -353,55 +357,57 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       setUserErrorMsg('Informe um e-mail válido.');
       return;
     }
-    if (!newUserPass || newUserPass.length < 3) {
-      setUserErrorMsg('A senha deve ter pelo menos 3 dígitos.');
+    if (newUserPass.length < MIN_PASSWORD_LENGTH) {
+      setUserErrorMsg(`A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
 
-    triggerSectionSave('sec-5-create', () => {
-      const res = registerNewUser(newUserName, newUserEmail, newUserPass, newUserRole, newUserDoc);
-      if (res.success && res.user) {
-        setUsersList(getStoredUsers());
-        setNewUserName('');
-        setNewUserEmail('');
-        setNewUserPass('123');
-        setNewUserDoc('');
-        setUserSuccessMsg(`Usuário ${res.user.name} cadastrado com sucesso!`);
-        setTimeout(() => setUserSuccessMsg(null), 3500);
-      } else {
-        setUserErrorMsg(res.error || 'Erro ao cadastrar usuário.');
-        setTimeout(() => setUserErrorMsg(null), 3500);
-      }
-    }, 'Usuário cadastrado e salvo com sucesso!');
+    setSavingSection('sec-5-create');
+    setSavingProgress(40);
+    const res = await createUserAccount({
+      name: newUserName,
+      email: newUserEmail,
+      password: newUserPass,
+      role: newUserRole,
+      documentRegistration: newUserDoc,
+    });
+    setSavingProgress(100);
+    setSavingSection(null);
+
+    if (res.success && res.user) {
+      await refreshUsers();
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPass('');
+      setNewUserDoc('');
+      flashUserMsg('success', `Usuário ${res.user.name} cadastrado com sucesso!`);
+      if (onShowToast) onShowToast('Usuário cadastrado e salvo com sucesso!');
+    } else {
+      flashUserMsg('error', res.error || 'Erro ao cadastrar usuário.');
+    }
   };
 
-  const handleResetPassword = (userId: string) => {
-    if (!resetPassValue || resetPassValue.length < 3) {
-      setUserErrorMsg('A senha deve ter pelo menos 3 dígitos.');
+  const handleResetPassword = async (userId: string) => {
+    if (resetPassValue.length < MIN_PASSWORD_LENGTH) {
+      setUserErrorMsg(`A senha deve ter pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
 
     setIsResettingPass(true);
-    setResetPassProgress(25);
-    setTimeout(() => setResetPassProgress(60), 120);
-    setTimeout(() => setResetPassProgress(90), 240);
+    setResetPassProgress(40);
+    const target = usersList.find((u) => u.id === userId);
+    const res = await adminResetPassword(userId, resetPassValue);
+    setResetPassProgress(100);
 
-    setTimeout(() => {
-      setResetPassProgress(100);
-      const users = getStoredUsers();
-      const idx = users.findIndex(u => u.id === userId);
-      if (idx !== -1) {
-        users[idx].password = resetPassValue;
-        saveStoredUsers(users);
-        setUsersList(users);
-        setResettingUserId(null);
-        setResetPassValue('123');
-        setUserSuccessMsg(`Senha do usuário ${users[idx].name} redefinida para "${resetPassValue}"!`);
-        setTimeout(() => setUserSuccessMsg(null), 3500);
-      }
-      setIsResettingPass(false);
-      setResetPassProgress(0);
-    }, 380);
+    if (res.success) {
+      setResettingUserId(null);
+      setResetPassValue('');
+      flashUserMsg('success', `Senha do usuário ${target?.name || ''} redefinida com sucesso!`);
+    } else {
+      flashUserMsg('error', res.error || 'Erro ao redefinir a senha.');
+    }
+    setIsResettingPass(false);
+    setResetPassProgress(0);
   };
 
   const handleConfirmClearQuotes = () => {
@@ -423,17 +429,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }, 450);
   };
 
-  const handleRemoveUser = (userId: string, userName: string) => {
+  const handleRemoveUser = async (userId: string, userName: string) => {
     if (currentUser?.id === userId) {
       alert('Você não pode excluir sua própria conta atualmente em uso.');
       return;
     }
-    if (confirm(`Deseja remover o acesso de ${userName}?`)) {
-      const users = getStoredUsers().filter(u => u.id !== userId);
-      saveStoredUsers(users);
-      setUsersList(users);
-      setUserSuccessMsg(`Usuário ${userName} removido.`);
-      setTimeout(() => setUserSuccessMsg(null), 3500);
+    if (!confirm(`Deseja remover o acesso de ${userName}?`)) return;
+    const res = await deleteUserAccount(userId);
+    if (res.success) {
+      await refreshUsers();
+      flashUserMsg('success', `Usuário ${userName} removido.`);
+    } else {
+      flashUserMsg('error', res.error || 'Erro ao remover usuário.');
     }
   };
 
@@ -957,7 +964,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           )}
 
-          {/* Cadastro de Novo Usuário */}
+          {/* Cadastro de Novo Usuário (somente administradores) */}
+          {!isAdmin && (
+            <div className="p-3 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/40 text-xs text-[#49607e] flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[#004328]">lock</span>
+              <span>Novos acessos, perfis e senhas de outros usuários são gerenciados por um <strong>Administrador</strong>. Você pode editar seus próprios dados e alterar sua senha.</span>
+            </div>
+          )}
+          {isAdmin && (
           <div className="p-4 rounded-xl bg-[#f8faff] border border-[#dbe7ff] flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px] text-[#004328]">person_add</span>
@@ -991,13 +1005,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <label className="block text-[11px] font-bold text-[#49607e] mb-1">Perfil / Função</label>
                 <select
                   value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as typeof newUserRole)}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                   className="w-full h-9 px-2 rounded-lg bg-white border border-[#cbd5e1] text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#004328]"
                 >
-                  <option value="Responsável Técnico">Responsável Técnico</option>
-                  <option value="Responsável Técnico e Administrador">Responsável Técnico e Administrador</option>
-                  <option value="Comercial">Comercial</option>
-                  <option value="Administrador">Administrador</option>
+                  {USER_ROLES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
                 </select>
               </div>
 
@@ -1018,7 +1031,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="text"
                   value={newUserPass}
                   onChange={(e) => setNewUserPass(e.target.value)}
-                  placeholder="Senha (padrão 123)"
+                  placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`}
+                  autoComplete="new-password"
                   className="w-full h-9 px-3 rounded-lg bg-white border border-[#cbd5e1] text-xs text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#004328]"
                 />
               </div>
@@ -1056,6 +1070,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             )}
           </div>
+          )}
 
           {/* Tabela de Contas Registradas */}
           <div className="flex flex-col gap-2">
@@ -1102,18 +1117,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 justify-end">
-                      {isResetting ? (
+                      {(isAdmin || isCurrent) && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingUser(user)}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#49607e] hover:bg-[#eff4ff] hover:text-[#004328] flex items-center gap-1 transition-colors border border-slate-200"
+                          title={isAdmin ? 'Editar dados, perfil e senha deste usuário' : 'Editar meus dados'}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">edit</span>
+                          <span>Editar</span>
+                        </button>
+                      )}
+
+                      {!isAdmin ? null : isResetting ? (
                         <div className="flex items-center gap-1.5 bg-amber-50 p-1.5 rounded-xl border border-amber-200">
                           <input
                             type="text"
                             value={resetPassValue}
                             onChange={(e) => setResetPassValue(e.target.value)}
-                            placeholder="Nova senha"
+                            placeholder={`Mín. ${MIN_PASSWORD_LENGTH} caracteres`}
+                            autoComplete="new-password"
                             className="w-24 h-7 px-2 text-xs rounded bg-white border border-amber-300 font-mono"
                           />
                           <button
                             type="button"
                             onClick={() => handleResetPassword(user.id)}
+                            disabled={isResettingPass}
                             className="h-7 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-[10px] font-bold"
                           >
                             Salvar
@@ -1131,7 +1160,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                           type="button"
                           onClick={() => {
                             setResettingUserId(user.id);
-                            setResetPassValue('123');
+                            setResetPassValue('');
                           }}
                           className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#49607e] hover:bg-[#eff4ff] hover:text-[#004328] flex items-center gap-1 transition-colors border border-slate-200"
                           title="Redefinir senha deste usuário"
@@ -1141,7 +1170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         </button>
                       )}
 
-                      {!isCurrent && (
+                      {isAdmin && !isCurrent && (
                         <button
                           type="button"
                           onClick={() => handleRemoveUser(user.id, user.name)}
@@ -1266,6 +1295,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           if (onShowToast) {
             onShowToast('Configurações globais de cabeçalho e textos atualizadas com sucesso!');
           }
+        }}
+      />
+
+      {/* Modal de Edição de Usuário */}
+      <EditUserModal
+        isOpen={editingUser !== null}
+        user={editingUser}
+        onClose={() => setEditingUser(null)}
+        onUserUpdated={(updated) => {
+          setUsersList((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+          if (onShowToast) onShowToast(`Dados de ${updated.name} atualizados com sucesso!`);
         }}
       />
 

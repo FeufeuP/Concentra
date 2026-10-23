@@ -1,27 +1,22 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  AuthUser, 
-  loginUser, 
-  registerNewUser,
-  requestPasswordReset,
-  confirmPasswordReset
-} from '@/lib/auth';
+import { AuthUser, loginUser, requestPasswordReset, isRemoteAuth } from '@/lib/auth';
 import { getStoredLogoUrl } from '@/lib/logo';
 import { DIRECT_LOGO_URL } from '@/lib/mock-data';
 
 interface LoginViewProps {
   onLoginSuccess: (user: AuthUser) => void;
+  /** Mensagem exibida ao abrir a tela (ex.: link de recuperação expirado). */
+  initialError?: string | null;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
-  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, initialError = null }) => {
   const [identifier, setIdentifier] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [rememberMe, setRememberMe] = useState<boolean>(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(initialError);
+  const [remoteAuth] = useState<boolean>(() => isRemoteAuth());
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [logoUrl, setLogoUrl] = useState<string>(() => getStoredLogoUrl());
 
@@ -35,106 +30,54 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     };
   }, []);
 
-  // Cadastro de novo usuário
-  const [newName, setNewName] = useState<string>('');
-  const [newEmail, setNewEmail] = useState<string>('');
-  const [newPass, setNewPass] = useState<string>('');
-  const [newRole, setNewRole] = useState<'Responsável Técnico' | 'Comercial' | 'Administrador'>('Responsável Técnico');
-  const [newDoc, setNewDoc] = useState<string>('');
-
   // Modal esqueci senha / recuperação por e-mail
   const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
   const [recoveryEmail, setRecoveryEmail] = useState<string>('');
-  const [recoveryStep, setRecoveryStep] = useState<'email' | 'code' | 'success'>('email');
-  const [recoveryCodeInput, setRecoveryCodeInput] = useState<string>('');
-  const [simulatedCode, setSimulatedCode] = useState<string | null>(null);
-  const [recoveryNewPass, setRecoveryNewPass] = useState<string>('');
-  const [recoveryConfirmPass, setRecoveryConfirmPass] = useState<string>('');
+  const [recoveryStep, setRecoveryStep] = useState<'email' | 'sent'>('email');
+  const [recoverySentMsg, setRecoverySentMsg] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [recoveryLoading, setRecoveryLoading] = useState<boolean>(false);
 
   const handleOpenForgot = () => {
     setRecoveryEmail(identifier.includes('@') ? identifier : '');
     setRecoveryStep('email');
-    setRecoveryCodeInput('');
-    setSimulatedCode(null);
-    setRecoveryNewPass('');
-    setRecoveryConfirmPass('');
+    setRecoverySentMsg(null);
     setRecoveryError(null);
     setShowForgotModal(true);
   };
 
-  const handleRequestRecoveryEmail = (e: React.FormEvent) => {
+  const handleRequestRecoveryEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setRecoveryError(null);
     setRecoveryLoading(true);
 
-    const res = requestPasswordReset(recoveryEmail);
-    setRecoveryLoading(false);
-
-    if (res.success && res.recoveryCode) {
-      setSimulatedCode(res.recoveryCode);
-      setRecoveryStep('code');
-    } else {
-      setRecoveryError(res.error || 'Não foi possível enviar o código para o e-mail informado.');
-    }
-  };
-
-  const handleConfirmRecovery = (e: React.FormEvent) => {
-    e.preventDefault();
-    setRecoveryError(null);
-
-    if (recoveryNewPass !== recoveryConfirmPass) {
-      setRecoveryError('A nova senha e a confirmação não coincidem.');
-      return;
-    }
-
-    if (recoveryNewPass.length < 3) {
-      setRecoveryError('A nova senha deve ter no mínimo 3 caracteres.');
-      return;
-    }
-
-    setRecoveryLoading(true);
-    const res = confirmPasswordReset(recoveryEmail, recoveryCodeInput, recoveryNewPass);
+    const res = await requestPasswordReset(recoveryEmail);
     setRecoveryLoading(false);
 
     if (res.success) {
-      setRecoveryStep('success');
-      setIdentifier(recoveryEmail);
-      setPassword(recoveryNewPass);
+      setRecoverySentMsg(res.message || 'Link de recuperação enviado.');
+      setRecoveryStep('sent');
     } else {
-      setRecoveryError(res.error || 'Erro ao redefinir a senha.');
+      setRecoveryError(res.error || 'Não foi possível enviar o link para o e-mail informado.');
     }
   };
 
-  const handleLogin = (e?: React.FormEvent) => {
+  const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMsg(null);
     setIsLoading(true);
 
     try {
-      const res = loginUser(identifier, password, rememberMe);
-      setIsLoading(false);
+      const res = await loginUser(identifier, password);
       if (res.success && res.user) {
         onLoginSuccess(res.user);
       } else {
         setErrorMsg(res.error || 'Credenciais inválidas.');
       }
-    } catch (err) {
-      setIsLoading(false);
+    } catch {
       setErrorMsg('Erro inesperado ao processar login.');
-    }
-  };
-
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    const res = registerNewUser(newName, newEmail, newPass, newRole, newDoc);
-    if (res.success && res.user) {
-      onLoginSuccess(res.user);
-    } else {
-      setErrorMsg(res.error || 'Erro ao cadastrar usuário.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -206,17 +149,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             
             <div className="flex items-center justify-between pb-4 mb-5 border-b border-[#f1f5f9]">
               <div>
-                <h2 className="text-lg font-bold text-[#0b1c30]">
-                  {isRegisterMode ? 'Cadastrar Novo Acesso' : 'Identificação de Usuário'}
-                </h2>
-                <p className="text-xs text-[#64748b]">
-                  {isRegisterMode ? 'Informe os dados do colaborador' : 'Entre com seu e-mail e senha de acesso'}
-                </p>
+                <h2 className="text-lg font-bold text-[#0b1c30]">Identificação de Usuário</h2>
+                <p className="text-xs text-[#64748b]">Entre com seu e-mail e senha de acesso</p>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-[#eff4ff] text-[#004328] flex items-center justify-center font-bold">
-                <span className="material-symbols-outlined text-[20px]">
-                  {isRegisterMode ? 'person_add' : 'key'}
-                </span>
+                <span className="material-symbols-outlined text-[20px]">key</span>
               </div>
             </div>
 
@@ -227,9 +164,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {!isRegisterMode ? (
-              /* Formulário de Login */
-              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            {/* Formulário de Login */}
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
                 <div>
                   <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
                     E-mail ou Nome do Usuário
@@ -293,18 +229,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-[#49607e] py-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#004328] focus:ring-[#004328] accent-[#004328]"
-                    />
-                    <span>Lembrar meu acesso neste navegador</span>
-                  </label>
-                </div>
-
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -323,111 +247,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   )}
                 </button>
 
-                {/* Alternar para cadastro */}
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsRegisterMode(true)}
-                    className="text-xs font-semibold text-[#49607e] hover:text-[#004328] transition-colors"
-                  >
-                    Novo na equipe? <strong className="text-[#004328] underline">Cadastrar novo usuário</strong>
-                  </button>
+                {/* Novos acessos: somente pelo administrador */}
+                <div className="pt-2 flex items-start gap-2 text-[11px] text-[#64748b] bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3">
+                  <span className="material-symbols-outlined text-[16px] text-[#004328] shrink-0">info</span>
+                  <span>
+                    Novo na equipe? Os acessos são criados pelo administrador em <strong>Configurações &gt; Usuários</strong>.
+                  </span>
                 </div>
-              </form>
-            ) : (
-              /* Formulário de Registro */
-              <form onSubmit={handleRegister} className="flex flex-col gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    Nome Completo
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Ex: João Victor Silva"
-                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    E-mail Corporativo
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="Ex: joao.silva@consentra.com.br"
-                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                      Função / Perfil
-                    </label>
-                    <select
-                      value={newRole}
-                      onChange={(e) => setNewRole(e.target.value as typeof newRole)}
-                      className="w-full h-10 px-2.5 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                    >
-                      <option value="Responsável Técnico">Responsável Técnico</option>
-                      <option value="Comercial">Comercial</option>
-                      <option value="Administrador">Administrador</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                      Registro (CREA/CRM/MTE)
-                    </label>
-                    <input
-                      type="text"
-                      value={newDoc}
-                      onChange={(e) => setNewDoc(e.target.value)}
-                      placeholder="Ex: CREA-SP 123.456"
-                      className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    Senha Provisória
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={newPass}
-                    onChange={(e) => setNewPass(e.target.value)}
-                    placeholder="Mínimo 3 caracteres"
-                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div className="pt-2 flex flex-col gap-2">
-                  <button
-                    type="submit"
-                    className="w-full h-10 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-                    <span>Criar Conta e Entrar</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsRegisterMode(false)}
-                    className="w-full h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#49607e] text-xs font-semibold transition-colors"
-                  >
-                    Voltar para Login
-                  </button>
-                </div>
-              </form>
-            )}
-
+            </form>
           </div>
         </div>
       </div>
@@ -474,7 +301,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     Digite seu e-mail corporativo cadastrado:
                   </label>
                   <p className="text-[11px] text-[#64748b] mb-2">
-                    Enviaremos um código de verificação para que você possa redefinir sua senha com segurança.
+                    Enviaremos um link seguro para que você possa cadastrar uma nova senha.
                   </p>
                   <div className="relative">
                     <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] text-[18px]">
@@ -494,7 +321,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 text-[11px] text-emerald-900 flex items-start gap-2">
                   <span className="material-symbols-outlined text-[16px] text-emerald-700 shrink-0 mt-0.5">info</span>
                   <span>
-                    Qualquer colaborador ou administrador com e-mail corporativo cadastrado pode solicitar o código de recuperação instantaneamente.
+                    {remoteAuth
+                      ? 'O link expira em 1 hora e só pode ser usado uma vez. Se não receber, verifique o spam ou peça ao administrador para redefinir sua senha.'
+                      : 'Modo local (sem servidor): o envio de e-mail não está disponível. Peça ao administrador para redefinir sua senha em Configurações > Usuários.'}
                   </span>
                 </div>
 
@@ -519,7 +348,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[16px]">send</span>
-                        <span>Enviar Código</span>
+                        <span>Enviar Link</span>
                       </>
                     )}
                   </button>
@@ -527,92 +356,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </form>
             )}
 
-            {recoveryStep === 'code' && (
-              <form onSubmit={handleConfirmRecovery} className="flex flex-col gap-3.5">
-                {simulatedCode && (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex flex-col gap-1">
-                    <div className="flex items-center gap-1.5 font-bold text-emerald-800">
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      <span>Código de recuperação enviado para {recoveryEmail}</span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1 bg-white p-2 rounded-lg border border-emerald-200">
-                      <span className="text-[11px] text-slate-600">Código gerado (demonstração):</span>
-                      <span className="font-mono font-black text-sm text-[#004328] tracking-widest">{simulatedCode}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    Código de 6 dígitos recebido:
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={recoveryCodeInput}
-                    onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Ex: 582910"
-                    className="w-full h-11 px-4 text-center font-mono font-bold tracking-widest text-base rounded-xl bg-[#f8fafc] text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    Nova Senha de Acesso:
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={recoveryNewPass}
-                    onChange={(e) => setRecoveryNewPass(e.target.value)}
-                    placeholder="Mínimo 3 caracteres"
-                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
-                    Confirmar Nova Senha:
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    value={recoveryConfirmPass}
-                    onChange={(e) => setRecoveryConfirmPass(e.target.value)}
-                    placeholder="Repita a nova senha"
-                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setRecoveryStep('email')}
-                    className="text-xs text-slate-500 hover:text-slate-800 font-medium"
-                  >
-                    Voltar / Trocar E-mail
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={recoveryLoading}
-                    className="px-5 py-2.5 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">lock_reset</span>
-                    <span>Redefinir Senha</span>
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {recoveryStep === 'success' && (
+            {recoveryStep === 'sent' && (
               <div className="flex flex-col items-center text-center py-2">
                 <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
-                  <span className="material-symbols-outlined text-[32px]">task_alt</span>
+                  <span className="material-symbols-outlined text-[32px]">forward_to_inbox</span>
                 </div>
-                <h4 className="text-base font-bold text-[#0b1c30] mb-1">Senha Atualizada com Sucesso!</h4>
-                <p className="text-xs text-[#64748b] max-w-xs mb-5">
-                  Sua nova senha já está ativa para o e-mail <strong>{recoveryEmail}</strong>. Seus novos dados foram salvos.
+                <h4 className="text-base font-bold text-[#0b1c30] mb-1">Verifique seu e-mail</h4>
+                <p className="text-xs text-[#64748b] max-w-xs mb-5">{recoverySentMsg}</p>
+                <p className="text-[11px] text-[#64748b] max-w-xs mb-5">
+                  Abra o link recebido neste mesmo navegador para cadastrar a nova senha.
                 </p>
                 <button
                   type="button"
@@ -620,7 +372,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   className="w-full h-11 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
                 >
                   <span className="material-symbols-outlined text-[18px]">login</span>
-                  <span>Acessar o Sistema Agora</span>
+                  <span>Voltar ao Login</span>
                 </button>
               </div>
             )}

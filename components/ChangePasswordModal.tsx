@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AuthUser, changeUserPassword } from '@/lib/auth';
+import { AuthUser, changeUserPassword, MIN_PASSWORD_LENGTH } from '@/lib/auth';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
   if (!isOpen || !currentUser) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -33,13 +33,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       return;
     }
 
-    if (newPass.length < 3) {
-      setErrorMsg('A nova senha deve ter no mínimo 3 caracteres.');
+    if (newPass.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`A nova senha deve ter no mínimo ${MIN_PASSWORD_LENGTH} caracteres.`);
       return;
     }
 
     setIsSubmitting(true);
-    const res = changeUserPassword(currentUser.id, currentPass, newPass);
+    const res = await changeUserPassword(currentUser.id, currentPass, newPass);
     setIsSubmitting(false);
 
     if (res.success) {
@@ -92,7 +92,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               required
               value={currentPass}
               onChange={(e) => setCurrentPass(e.target.value)}
-              placeholder="Digite sua senha atual (padrão: 123)"
+              placeholder="Digite sua senha atual"
               className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
             />
           </div>
@@ -106,7 +106,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               required
               value={newPass}
               onChange={(e) => setNewPass(e.target.value)}
-              placeholder="Digite a nova senha desejada"
+              placeholder={`Nova senha (mínimo ${MIN_PASSWORD_LENGTH} caracteres)`}
               className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
             />
           </div>

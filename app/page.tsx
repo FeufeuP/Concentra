@@ -14,11 +14,12 @@ import { EmailModal } from '@/components/EmailModal';
 import { ServiceOrderModal } from '@/components/ServiceOrderModal';
 import { LoginView } from '@/components/LoginView';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
+import { RecoveryPasswordModal } from '@/components/RecoveryPasswordModal';
 import { ReportsView } from '@/components/ReportsView';
 import { Quote, QuoteStatus, ClientData, CatalogService } from '@/lib/types';
 import { INITIAL_QUOTES, INITIAL_CLIENTS, CATALOG_SERVICES, DEFAULT_EMPTY_QUOTE } from '@/lib/mock-data';
 import { getStoredResponsibles, saveStoredResponsibles } from '@/lib/responsibles';
-import { AuthUser, getCurrentUser, logoutUser } from '@/lib/auth';
+import { AuthUser, getCurrentUser, logoutUser, initAuth, onAuthEvent, isRemoteAuth } from '@/lib/auth';
 import { 
   isSupabaseConfigured, 
   fetchQuotesFromSupabase, 
@@ -45,6 +46,10 @@ const CLIENTS_STORAGE_KEY = 'consentra_clients_data';
 export default function HomePage() {
   const isMounted = useIsMounted();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getCurrentUser());
+  // No modo Supabase a sessão é validada no servidor antes de exibir o sistema
+  const [authChecked, setAuthChecked] = useState<boolean>(() => !isRemoteAuth());
+  const [recoveryMode, setRecoveryMode] = useState<boolean>(false);
+  const [authLinkError, setAuthLinkError] = useState<string | null>(null);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState<boolean>(false);
 
   const [quotes, setQuotes] = useState<Quote[]>(() => {
@@ -100,11 +105,36 @@ export default function HomePage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
 
-  // Carrega dados do Supabase se configurado
+  // Valida a sessão e acompanha eventos de autenticação (logout, recuperação de senha)
+  useEffect(() => {
+    let alive = true;
+    initAuth().then((res) => {
+      if (!alive) return;
+      setCurrentUser(res.user);
+      setRecoveryMode(res.recovery);
+      setAuthLinkError(res.linkError || null);
+      setAuthChecked(true);
+    });
+    const unsubscribe = onAuthEvent((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+        setCurrentUser(null);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+      }
+    });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Carrega dados do Supabase (somente com usuário autenticado — RLS exige sessão)
+  const currentUserId = currentUser?.id;
   useEffect(() => {
     let isMounted = true;
     async function loadSupabaseData() {
-      if (!isSupabaseConfigured()) return;
+      if (!isSupabaseConfigured() || !currentUserId) return;
       try {
         const [remoteQuotes, remoteClients] = await Promise.all([
           fetchQuotesFromSupabase(),
@@ -127,7 +157,7 @@ export default function HomePage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [currentUserId]);
 
   // Sincronização segura da sessão de autenticação no cliente
   useEffect(() => {
@@ -142,8 +172,8 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleLogout = () => {
-    logoutUser();
+  const handleLogout = async () => {
+    await logoutUser();
     setCurrentUser(null);
     showToast('Sessão encerrada com sucesso.');
   };
@@ -396,7 +426,7 @@ export default function HomePage() {
     showToast(`Serviço "${service.title}" incluído no orçamento ${updated.id}!`);
   };
 
-  if (!isMounted) {
+  if (!isMounted || !authChecked) {
     return (
       <div className="min-h-screen bg-[#f8f9ff] flex flex-col items-center justify-center p-4">
         <div className="w-10 h-10 border-4 border-[#004328] border-t-transparent rounded-full animate-spin mb-4" />
@@ -427,11 +457,22 @@ export default function HomePage() {
           </div>
         )}
         <LoginView
+          initialError={authLinkError}
           onLoginSuccess={(user) => {
             setCurrentUser(user);
             showToast(`Bem-vindo, ${user.name}!`);
           }}
         />
+        {recoveryMode && (
+          <RecoveryPasswordModal
+            onComplete={(user) => {
+              setRecoveryMode(false);
+              setCurrentUser(user);
+              showToast('Nova senha cadastrada com sucesso! Bem-vindo de volta.');
+            }}
+            onCancel={() => setRecoveryMode(false)}
+          />
+        )}
       </div>
     );
   }

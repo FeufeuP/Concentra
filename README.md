@@ -4,9 +4,12 @@ Sistema web para **emissão de orçamentos e propostas técnicas de Saúde e Seg
 com pipeline comercial, cadastro de clientes, catálogo de serviços (NRs, laudos, treinamentos, eSocial),
 relatórios e geração de PDF.
 
-> ⚠️ **Status: protótipo.** A autenticação atual é apenas demonstrativa (dados no navegador) e as
-> políticas do banco estão abertas. **Não use em produção com dados reais** antes de concluir a
-> Fase 2 (Segurança) descrita em [`MELHORIAS.md`](./MELHORIAS.md).
+> 🔐 **Segurança.** Com o Supabase configurado, o login usa **Supabase Auth** (senhas com bcrypt no
+> servidor) e o banco é protegido por **RLS** por usuário/perfil. Sem Supabase, o sistema roda em
+> **modo local** (dados no navegador), que serve apenas para demonstração.
+>
+> ⚠️ As senhas padrão abaixo são públicas (estão neste repositório). **Troque-as antes de usar com
+> dados reais** (Configurações → Usuários → Redefinir Senha, ou "Alterar Minha Senha").
 
 ---
 
@@ -43,7 +46,7 @@ relatórios e geração de PDF.
 # 1. Instalar dependências
 npm install
 
-# 2. (Opcional) Configurar o Supabase
+# 2. (Recomendado) Configurar o Supabase — veja a seção "Banco de dados"
 cp .env.example .env.local
 #    edite .env.local com a URL e a anon key do seu projeto
 
@@ -53,16 +56,34 @@ npm run dev
 ```
 
 Sem o arquivo `.env.local`, o sistema funciona em **modo local**: todos os dados ficam salvos no
-`localStorage` do navegador.
+`localStorage` do navegador (senhas com hash SHA-256 + salt, mas sem proteção real — qualquer um com
+acesso ao navegador pode alterar os dados).
 
-### Acesso de demonstração
+### Usuários padrão
 
-Usuários padrão definidos em `lib/auth.ts` (somente para demonstração):
+Os mesmos usuários existem no modo local (`lib/auth.ts`) e no Supabase (`supabase/seed_users.sql`):
 
-| Usuário | Senha |
+| Usuário | Perfil | Senha |
+|---|---|---|
+| `assis.sul@gmail.com` (Washington Assis) | Responsável Técnico e Administrador | `123` |
+| `admin@consentra.com.br` (Administrador Geral) | Administrador | `admin` |
+| `mariana@consentra.com.br` | Responsável Técnico | `123` |
+| `roberto@consentra.com.br` | Responsável Técnico | `123` |
+| `amanda@consentra.com.br` | Comercial | `123` |
+
+O login aceita o e-mail, o nome completo, o prefixo do e-mail (ex.: `admin`) ou um nome único
+(ex.: `amanda`). Novas senhas precisam ter **no mínimo 6 caracteres**.
+
+**Perfis de acesso**
+
+| Perfil | Permissões |
 |---|---|
-| `admin@consentra.com.br` | `admin` |
-| `assis.sul@gmail.com` | `123` |
+| Administrador / Responsável Técnico e Administrador | Tudo, inclusive gerenciar usuários e configurações globais |
+| Responsável Técnico / Comercial | Criar e editar orçamentos, clientes e serviços |
+| Auditor SST | Somente leitura |
+
+Não existe cadastro público: novos acessos são criados por um administrador em
+**Configurações → Usuários**.
 
 ### Scripts
 
@@ -80,15 +101,39 @@ Usuários padrão definidos em `lib/auth.ts` (somente para demonstração):
 ## Banco de dados (Supabase)
 
 1. Crie um projeto em <https://supabase.com/dashboard>.
-2. Abra **SQL Editor → New query**, cole o conteúdo de [`supabase/schema.sql`](./supabase/schema.sql) e execute.
-3. Copie **Project URL** e **anon public key** (Project Settings → API) para o `.env.local`:
+2. **SQL Editor → New query**: execute [`supabase/schema.sql`](./supabase/schema.sql) (tabelas,
+   funções, gatilhos e políticas RLS) e depois [`supabase/seed_users.sql`](./supabase/seed_users.sql)
+   (cria os usuários padrão no Supabase Auth com as senhas da tabela acima).
+3. Publique a Edge Function de gestão de usuários (usa a *service role key*, que nunca vai para o
+   navegador):
+
+   ```bash
+   npx supabase login
+   npx supabase functions deploy admin-users --project-ref <ref-do-projeto> --no-verify-jwt
+   ```
+
+   O JWT do usuário é validado dentro da função (`auth.getUser`), e ela só executa as ações se quem
+   chama for administrador.
+4. **Authentication → Sign In / Providers**: desative *Allow new users to sign up*.
+5. **Authentication → URL Configuration**: defina o *Site URL* com o domínio de produção e inclua
+   em *Redirect URLs* `https://seu-dominio/**` e `http://localhost:3000/**` (link de recuperação de senha).
+6. Copie **Project URL** e **anon public key** (Project Settings → API) para o `.env.local` (e para as
+   variáveis de ambiente da hospedagem):
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
 
-Tabelas: `users`, `clients`, `catalog_services`, `quotes`, `quote_items`, `app_settings`.
+> A anon key é pública por natureza; a segurança vem das políticas RLS. **Nunca** coloque a
+> `service_role` key em variáveis `NEXT_PUBLIC_*`.
+
+**Tabelas:** `profiles` (ligada a `auth.users`), `clients`, `catalog_services`, `quotes`,
+`quote_items`, `app_settings`.
+
+**Recuperação de senha:** o usuário recebe um link por e-mail e define a nova senha no próprio
+sistema. O SMTP padrão do Supabase só envia para membros da equipe do projeto e tem limite baixo
+de envios. Para uso real, configure um SMTP próprio em **Authentication → Emails → SMTP Settings**.
 
 ## Estrutura
 
@@ -98,7 +143,7 @@ components/     telas e modais (Dashboard, Orçamentos, Novo Orçamento, PDF, Cl
 hooks/          hooks React
 lib/            regras de negócio: auth, acesso ao Supabase, gerador de PDF, máscaras, tipos, dados padrão
 public/         logos e favicons
-supabase/       schema SQL, políticas e seeds
+supabase/       schema SQL, políticas RLS, seed de usuários e Edge Function admin-users
 ```
 
 ## Roadmap

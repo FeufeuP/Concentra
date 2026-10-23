@@ -231,14 +231,19 @@ Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, 
 > ESLint mantido na v9: os plugins usados pelo `eslint-config-next` (`react`, `import`, `jsx-a11y`)
 > ainda não declaram suporte oficial ao ESLint 10.
 
-### Fase 2 — Segurança
+### Fase 2 — Segurança ✅
 
-- [ ] Migrar login para Supabase Auth
-- [ ] Remover senha-coringa `123`, código `123456`/qualquer 6 dígitos e `admin` como senha atual
-- [ ] Remover criação automática de contas no login e na recuperação de senha
-- [ ] Remover coluna `password` e transformar `users` em `profiles` ligada a `auth.users`
-- [ ] Reescrever políticas RLS por `auth.uid()` e role
-- [ ] Remover leitura de credenciais do Supabase via `localStorage`
+- [x] Migrar login para Supabase Auth (bcrypt no servidor; mesmos usuários e senhas de antes)
+- [x] Remover senha-coringa `123`, código `123456`/qualquer 6 dígitos e `admin` como senha atual
+- [x] Remover criação automática de contas no login e na recuperação de senha
+- [x] Remover coluna `password` e transformar `users` em `profiles` ligada a `auth.users`
+- [x] Reescrever políticas RLS por `auth.uid()` e role (anon bloqueado; Auditor SST só leitura; `app_settings` só admin; troca de perfil/e-mail só por admin, via gatilho)
+- [x] Remover leitura de credenciais do Supabase via `localStorage`
+- [x] Gestão de usuários (criar/editar/redefinir senha/excluir) pela Edge Function `admin-users`, com a service role apenas no servidor
+- [x] Cadastro público removido (signup desativado no Auth); recuperação de senha por link de e-mail
+- [x] Modo local endurecido: sem atalhos, senhas com hash SHA-256 + salt (migração automática)
+- [ ] Trocar as senhas padrão (expostas no repositório público), quando o cliente decidir
+- [ ] Configurar SMTP próprio e o domínio de produção nas Redirect URLs do Supabase
 
 ### Fase 3 — Dados e persistência
 
