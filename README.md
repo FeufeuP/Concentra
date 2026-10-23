@@ -143,6 +143,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 
 ### E-mail das propostas (Resend)
 
+> 📘 **Passo a passo completo, para quem nunca configurou e-mail:** [`CONFIGURAR_EMAIL.md`](./CONFIGURAR_EMAIL.md)
+> (inclui DNS no Registro.br/hospedagens, testes, recuperação de senha e solução de problemas).
+
 O botão **Enviar por E-mail** usa a Edge Function `send-quote-email` e o serviço
 [Resend](https://resend.com) (plano gratuito: 3.000 e-mails/mês).
 
