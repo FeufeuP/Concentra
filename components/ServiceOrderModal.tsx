@@ -46,12 +46,21 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   const [isManagingResponsibles, setIsManagingResponsibles] = useState(false);
   const [newResponsibleInput, setNewResponsibleInput] = useState('');
 
-  // Sincronização e classes de controle de impressão
+  // Recarrega perfil da empresa e logo sempre que o modal é aberto
+  // (ajuste de estado durante o render, padrão recomendado pelo React em vez de setState em efeito)
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen);
+    if (isOpen) {
+      setCompanyProfile(getStoredCompanyProfile());
+      setLogoUrl(getStoredLogoUrl());
+    }
+  }
+
+  // Classes de controle de impressão
   useEffect(() => {
     if (isOpen) {
       document.body.classList.add('os-modal-open');
-      setCompanyProfile(getStoredCompanyProfile());
-      setLogoUrl(getStoredLogoUrl());
     } else {
       document.body.classList.remove('os-modal-open');
     }

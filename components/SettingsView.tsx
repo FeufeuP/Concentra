@@ -991,7 +991,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <label className="block text-[11px] font-bold text-[#49607e] mb-1">Perfil / Função</label>
                 <select
                   value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as any)}
+                  onChange={(e) => setNewUserRole(e.target.value as typeof newUserRole)}
                   className="w-full h-9 px-2 rounded-lg bg-white border border-[#cbd5e1] text-xs font-semibold text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#004328]"
                 >
                   <option value="Responsável Técnico">Responsável Técnico</option>

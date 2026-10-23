@@ -163,7 +163,7 @@ const EditUserDialogContent: React.FC<EditUserDialogContentProps> = ({
               <label className="block font-semibold text-[#404942] mb-1">Perfil / Função no Sistema</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as any)}
+                onChange={(e) => setRole(e.target.value as AuthUser['role'])}
                 disabled={isSaving}
                 className="w-full h-10 px-2 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/40 text-[#0b1c30] font-semibold focus:bg-white focus:outline-none"
               >

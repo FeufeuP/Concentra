@@ -372,7 +372,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     </label>
                     <select
                       value={newRole}
-                      onChange={(e) => setNewRole(e.target.value as any)}
+                      onChange={(e) => setNewRole(e.target.value as typeof newRole)}
                       className="w-full h-10 px-2.5 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#004328]"
                     >
                       <option value="Responsável Técnico">Responsável Técnico</option>

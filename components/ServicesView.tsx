@@ -449,7 +449,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
                 <span className="text-xs text-[#49607e] font-medium hidden sm:inline">Ordenar:</span>
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                   className="h-10 px-3 rounded-xl bg-[#eff4ff] text-xs font-medium text-[#0b1c30] border border-transparent focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]"
                 >
                   <option value="recent">Mais Recentes</option>

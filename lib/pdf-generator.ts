@@ -28,6 +28,28 @@ export interface ReportSummary {
 }
 
 /**
+ * Tipagem mínima da cadeia fluente do html2pdf.js utilizada neste módulo
+ */
+interface Html2PdfWorker {
+  set(options: Record<string, unknown>): Html2PdfWorker;
+  from(element: HTMLElement): Html2PdfWorker;
+  toPdf(): Html2PdfWorker;
+  get(key: 'pdf'): Promise<jsPDF>;
+  save(): Promise<void>;
+  output(type: 'blob'): Promise<Blob>;
+}
+
+type Html2PdfFactory = () => Html2PdfWorker;
+
+/**
+ * Import dinâmico do html2pdf.js (somente no navegador, compatível com SSR / App Router)
+ */
+async function loadHtml2Pdf(): Promise<Html2PdfFactory> {
+  const mod = (await import('html2pdf.js')) as unknown as { default?: Html2PdfFactory } & Html2PdfFactory;
+  return mod.default || mod;
+}
+
+/**
  * Formata valor monetário em Real (BRL)
  */
 function formatCurrency(val: number): string {
@@ -335,8 +357,7 @@ export async function generateQuotePdfDoc(quote: Quote): Promise<jsPDF> {
 
   try {
     // Import dinâmico do html2pdf.js para compatibilidade SSR / App Router
-    const html2pdfModule: any = await import('html2pdf.js');
-    const html2pdf = html2pdfModule.default || html2pdfModule;
+    const html2pdf = await loadHtml2Pdf();
 
     const opt = {
       margin: 0,
@@ -378,8 +399,7 @@ export async function downloadQuotePdf(quote: Quote): Promise<boolean> {
     const cleanClient = (quote.clientName || 'Cliente').replace(/[^a-zA-Z0-9]/g, '_').substring(0, 25);
     const fileName = `Proposta_Tecnica_Consentra_${cleanNum}_${cleanClient}.pdf`;
 
-    const html2pdfModule: any = await import('html2pdf.js');
-    const html2pdf = html2pdfModule.default || html2pdfModule;
+    const html2pdf = await loadHtml2Pdf();
 
     const opt = {
       margin: 0,
@@ -421,8 +441,7 @@ export async function printQuotePdf(quote: Quote): Promise<boolean> {
   const { element, cleanup } = await getOrBuildA4Element(quote);
 
   try {
-    const html2pdfModule: any = await import('html2pdf.js');
-    const html2pdf = html2pdfModule.default || html2pdfModule;
+    const html2pdf = await loadHtml2Pdf();
 
     const opt = {
       margin: 0,

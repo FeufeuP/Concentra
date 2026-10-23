@@ -1,8 +1,83 @@
 'use client';
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Quote, QuoteItem, ClientData, CatalogService } from './types';
+import { Quote, QuoteItem, QuoteStatus, ClientData } from './types';
 import { AuthUser } from './auth';
+
+// ==============================================================================
+// TIPOS DAS LINHAS DO BANCO (snake_case) E HELPERS
+// ==============================================================================
+
+interface QuoteRow {
+  id: string;
+  number_only: number;
+  client_id: string;
+  client_name: string;
+  cnpj: string;
+  ie: string | null;
+  contact_person: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  operational_address: string | null;
+  risk_grade: string | null;
+  issue_date: string;
+  validity_days: number;
+  validity_date: string;
+  execution_forecast: string;
+  status: QuoteStatus;
+  scope_summary: string | null;
+  subtotal: number | string;
+  discount: number | string;
+  total: number | string;
+  installments: number | null;
+  installment_value: number | string;
+  payment_condition: string | null;
+  observations: string | null;
+  regulatory_scope: string[] | null;
+  responsible_tech: string | null;
+  macro_category: string | null;
+  sub_category: string | null;
+  status_sub_stage: string | null;
+  demand_origin: string | null;
+  priority: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ClientRow {
+  id: string;
+  name: string;
+  cnpj: string;
+  ie: string | null;
+  risk_grade: string;
+  cnae: string | null;
+  contact_name: string;
+  contact_role: string | null;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface UserRow {
+  id: string;
+  name: string;
+  email: string;
+  role: AuthUser['role'];
+  password: string;
+  initials: string;
+  avatar_bg: string | null;
+  document_registration: string | null;
+  phone: string | null;
+}
+
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err) {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === 'string' && msg) return msg;
+  }
+  return fallback;
+}
 
 // Storage keys for runtime client overrides if needed
 const STORAGE_URL_KEY = 'consentra_supabase_url';
@@ -113,10 +188,10 @@ export async function testSupabaseConnection(): Promise<{ success: boolean; mess
       success: true,
       message: `Conexão estabelecida com sucesso com o PostgreSQL do Supabase! (${data?.length ?? 0} registros consultados na tabela users).`,
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       success: false,
-      message: `Erro ao conectar: ${err?.message || 'Falha de rede ou CORS'}`,
+      message: `Erro ao conectar: ${getErrorMessage(err, 'Falha de rede ou CORS')}`,
     };
   }
 }
@@ -171,7 +246,7 @@ export async function fetchQuotesFromSupabase(): Promise<Quote[] | null> {
     }
 
     // Map database snake_case to TypeScript Quote interface
-    return quotesData.map((q: any): Quote => ({
+    return (quotesData as QuoteRow[]).map((q): Quote => ({
       id: q.id,
       numberOnly: q.number_only,
       clientId: q.client_id,
@@ -287,8 +362,8 @@ export async function saveQuoteToSupabase(quote: Quote): Promise<{ success: bool
     }
 
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro inesperado' };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro inesperado') };
   }
 }
 
@@ -300,8 +375,8 @@ export async function deleteQuoteFromSupabase(quoteId: string): Promise<{ succes
     const { error } = await client.from('quotes').delete().eq('id', quoteId);
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro inesperado' };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro inesperado') };
   }
 }
 
@@ -324,7 +399,7 @@ export async function fetchClientsFromSupabase(): Promise<ClientData[] | null> {
       return null;
     }
 
-    return data.map((c: any): ClientData => ({
+    return (data as ClientRow[]).map((c): ClientData => ({
       id: c.id,
       name: c.name,
       cnpj: c.cnpj,
@@ -366,8 +441,8 @@ export async function saveClientToSupabase(c: ClientData): Promise<{ success: bo
     const { error } = await client.from('clients').upsert(payload, { onConflict: 'id' });
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro ao salvar cliente' };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro ao salvar cliente') };
   }
 }
 
@@ -379,8 +454,8 @@ export async function deleteClientFromSupabase(clientId: string): Promise<{ succ
     const { error } = await client.from('clients').delete().eq('id', clientId);
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro ao excluir cliente' };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro ao excluir cliente') };
   }
 }
 
@@ -400,7 +475,7 @@ export async function fetchUsersFromSupabase(): Promise<AuthUser[] | null> {
 
     if (error || !data) return null;
 
-    return data.map((u: any): AuthUser => ({
+    return (data as UserRow[]).map((u): AuthUser => ({
       id: u.id,
       name: u.name,
       email: u.email,
@@ -437,8 +512,8 @@ export async function saveUserToSupabase(u: AuthUser): Promise<{ success: boolea
     const { error } = await client.from('users').upsert(payload, { onConflict: 'id' });
     if (error) return { success: false, error: error.message };
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Erro ao salvar usuário' };
+  } catch (err) {
+    return { success: false, error: getErrorMessage(err, 'Erro ao salvar usuário') };
   }
 }
 
@@ -483,10 +558,10 @@ export async function syncAllLocalDataToSupabase(
       success: true,
       message: `Sincronização concluída com sucesso! ${quotesCount} orçamentos, ${clientsCount} clientes e ${usersCount} operadores enviados ao Supabase PostgreSQL.`,
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       success: false,
-      message: `Erro durante a sincronização: ${err?.message || 'Falha de comunicação'}`,
+      message: `Erro durante a sincronização: ${getErrorMessage(err, 'Falha de comunicação')}`,
     };
   }
 }

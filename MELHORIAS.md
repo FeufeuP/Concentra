@@ -213,17 +213,23 @@ Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, 
 
 ## 8. Roadmap de melhorias (checklist)
 
-### Fase 1 — Tornar o projeto executável (prioridade máxima)
+### Fase 1 — Tornar o projeto executável ✅ concluída
 
-- [ ] Adicionar `package.json` com versões atuais (Next.js corrigido) e lockfile
-- [ ] Adicionar `tsconfig.json` com alias `@/*`
-- [ ] Adicionar `next.config.ts` e `postcss.config.mjs` (Tailwind v4)
-- [ ] Adicionar `.gitignore` (`node_modules`, `.next`, `.env*`, etc.)
-- [ ] Adicionar `.env.example` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] Remover os arquivos-lixo de 1 byte
-- [ ] Escrever README (descrição, setup, variáveis de ambiente, como aplicar o schema)
-- [ ] Configurar ESLint + Prettier e scripts `lint` / `typecheck`
-- [ ] (Opcional) CI no GitHub Actions rodando `typecheck` + `build`
+- [x] Adicionar `package.json` com versões atuais (Next.js 16.4, React 19.3, Tailwind 4.3) e lockfile
+- [x] Adicionar `tsconfig.json` com alias `@/*`
+- [x] Adicionar `next.config.ts` (com `ALLOWED_DEV_ORIGINS` opcional para previews/túneis) e `postcss.config.mjs` (Tailwind v4)
+- [x] Adicionar `.gitignore` (`node_modules`, `.next`, `.env*`, etc.)
+- [x] Adicionar `.env.example` com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- [x] Remover os arquivos-lixo de 1 byte
+- [x] Escrever README (descrição, setup, variáveis de ambiente, como aplicar o schema)
+- [x] Configurar ESLint (flat config `eslint-config-next`) e scripts `lint` / `typecheck`
+- [x] Corrigir os 18 erros de lint (tipos `any` em `lib/supabase.ts`, `lib/pdf-generator.ts` e componentes; `setState` em efeito no `ServiceOrderModal`)
+- [x] CI no GitHub Actions rodando `lint` + `typecheck` + `build` (`.github/workflows/ci.yml`)
+- [ ] Prettier (opcional)
+- [ ] Zerar os 53 *warnings* restantes de lint (variáveis não usadas, `<img>` em vez de `next/image`) → tratado na Fase 4
+
+> ESLint mantido na v9: os plugins usados pelo `eslint-config-next` (`react`, `import`, `jsx-a11y`)
+> ainda não declaram suporte oficial ao ESLint 10.
 
 ### Fase 2 — Segurança
 
