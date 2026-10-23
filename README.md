@@ -66,13 +66,17 @@ acesso ao navegador pode alterar os dados).
 
 Os mesmos usuários existem no modo local (`lib/auth.ts`) e no Supabase (`supabase/seed_users.sql`):
 
-| Usuário | Perfil | Senha |
-|---|---|---|
-| `assis.sul@gmail.com` (Washington Assis) | Responsável Técnico e Administrador | `123` |
-| `admin@consentra.com.br` (Administrador Geral) | Administrador | `admin` |
-| `mariana@consentra.com.br` | Responsável Técnico | `123` |
-| `roberto@consentra.com.br` | Responsável Técnico | `123` |
-| `amanda@consentra.com.br` | Comercial | `123` |
+| Usuário | Perfil |
+|---|---|
+| `assis.sul@gmail.com` (Washington Assis) | Responsável Técnico e Administrador |
+| `admin@consentra.com.br` (Administrador Geral) | Administrador |
+| `mariana@consentra.com.br` | Responsável Técnico |
+| `roberto@consentra.com.br` | Responsável Técnico |
+| `amanda@consentra.com.br` | Comercial |
+
+As senhas não ficam documentadas aqui. Peça a um administrador, que pode redefini-las em
+**Configurações → Usuários → Redefinir Senha**. Cada usuário troca a própria senha pelo menu do
+seu nome (canto superior direito) → **Alterar Minha Senha**.
 
 O login aceita o e-mail, o nome completo, o prefixo do e-mail (ex.: `admin`) ou um nome único
 (ex.: `amanda`). Novas senhas precisam ter **no mínimo 6 caracteres**.
@@ -110,7 +114,7 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes e build em cada p
 1. Crie um projeto em <https://supabase.com/dashboard>.
 2. **SQL Editor → New query**: execute [`supabase/schema.sql`](./supabase/schema.sql) (tabelas,
    funções, gatilhos e políticas RLS) e depois [`supabase/seed_users.sql`](./supabase/seed_users.sql)
-   (cria os usuários padrão no Supabase Auth com as senhas da tabela acima).
+   (cria os usuários padrão no Supabase Auth; troque as senhas iniciais definidas no arquivo antes de usar em produção).
 3. Publique a Edge Function de gestão de usuários (usa a *service role key*, que nunca vai para o
    navegador):
 
