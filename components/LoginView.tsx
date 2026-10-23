@@ -1,0 +1,632 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { 
+  AuthUser, 
+  loginUser, 
+  registerNewUser,
+  requestPasswordReset,
+  confirmPasswordReset
+} from '@/lib/auth';
+import { getStoredLogoUrl } from '@/lib/logo';
+import { DIRECT_LOGO_URL } from '@/lib/mock-data';
+
+interface LoginViewProps {
+  onLoginSuccess: (user: AuthUser) => void;
+}
+
+export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
+  const [identifier, setIdentifier] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [rememberMe, setRememberMe] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [logoUrl, setLogoUrl] = useState<string>(() => getStoredLogoUrl());
+
+  useEffect(() => {
+    const handleLogoUpdated = (e: CustomEvent<string>) => {
+      setLogoUrl(e.detail || getStoredLogoUrl());
+    };
+    window.addEventListener('consentra_logo_updated', handleLogoUpdated as EventListener);
+    return () => {
+      window.removeEventListener('consentra_logo_updated', handleLogoUpdated as EventListener);
+    };
+  }, []);
+
+  // Cadastro de novo usuário
+  const [newName, setNewName] = useState<string>('');
+  const [newEmail, setNewEmail] = useState<string>('');
+  const [newPass, setNewPass] = useState<string>('');
+  const [newRole, setNewRole] = useState<'Responsável Técnico' | 'Comercial' | 'Administrador'>('Responsável Técnico');
+  const [newDoc, setNewDoc] = useState<string>('');
+
+  // Modal esqueci senha / recuperação por e-mail
+  const [showForgotModal, setShowForgotModal] = useState<boolean>(false);
+  const [recoveryEmail, setRecoveryEmail] = useState<string>('');
+  const [recoveryStep, setRecoveryStep] = useState<'email' | 'code' | 'success'>('email');
+  const [recoveryCodeInput, setRecoveryCodeInput] = useState<string>('');
+  const [simulatedCode, setSimulatedCode] = useState<string | null>(null);
+  const [recoveryNewPass, setRecoveryNewPass] = useState<string>('');
+  const [recoveryConfirmPass, setRecoveryConfirmPass] = useState<string>('');
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [recoveryLoading, setRecoveryLoading] = useState<boolean>(false);
+
+  const handleOpenForgot = () => {
+    setRecoveryEmail(identifier.includes('@') ? identifier : '');
+    setRecoveryStep('email');
+    setRecoveryCodeInput('');
+    setSimulatedCode(null);
+    setRecoveryNewPass('');
+    setRecoveryConfirmPass('');
+    setRecoveryError(null);
+    setShowForgotModal(true);
+  };
+
+  const handleRequestRecoveryEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError(null);
+    setRecoveryLoading(true);
+
+    const res = requestPasswordReset(recoveryEmail);
+    setRecoveryLoading(false);
+
+    if (res.success && res.recoveryCode) {
+      setSimulatedCode(res.recoveryCode);
+      setRecoveryStep('code');
+    } else {
+      setRecoveryError(res.error || 'Não foi possível enviar o código para o e-mail informado.');
+    }
+  };
+
+  const handleConfirmRecovery = (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError(null);
+
+    if (recoveryNewPass !== recoveryConfirmPass) {
+      setRecoveryError('A nova senha e a confirmação não coincidem.');
+      return;
+    }
+
+    if (recoveryNewPass.length < 3) {
+      setRecoveryError('A nova senha deve ter no mínimo 3 caracteres.');
+      return;
+    }
+
+    setRecoveryLoading(true);
+    const res = confirmPasswordReset(recoveryEmail, recoveryCodeInput, recoveryNewPass);
+    setRecoveryLoading(false);
+
+    if (res.success) {
+      setRecoveryStep('success');
+      setIdentifier(recoveryEmail);
+      setPassword(recoveryNewPass);
+    } else {
+      setRecoveryError(res.error || 'Erro ao redefinir a senha.');
+    }
+  };
+
+  const handleLogin = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMsg(null);
+    setIsLoading(true);
+
+    try {
+      const res = loginUser(identifier, password, rememberMe);
+      setIsLoading(false);
+      if (res.success && res.user) {
+        onLoginSuccess(res.user);
+      } else {
+        setErrorMsg(res.error || 'Credenciais inválidas.');
+      }
+    } catch (err) {
+      setIsLoading(false);
+      setErrorMsg('Erro inesperado ao processar login.');
+    }
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    const res = registerNewUser(newName, newEmail, newPass, newRole, newDoc);
+    if (res.success && res.user) {
+      onLoginSuccess(res.user);
+    } else {
+      setErrorMsg(res.error || 'Erro ao cadastrar usuário.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-[#f4f7fb] flex flex-col justify-between items-center p-4 sm:p-8 selection:bg-[#004328] selection:text-white">
+      {/* Top bar info */}
+      <div className="w-full max-w-5xl flex items-center justify-between py-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-semibold text-[#49607e]">Servidor Seguro Consentra SST</span>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-[#49607e]">
+          <span className="font-mono bg-white px-2 py-0.5 rounded border border-[#e2e8f0]">Versão 2.4</span>
+        </div>
+      </div>
+
+      {/* Main Container */}
+      <div className="w-full max-w-4xl my-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        
+        {/* Left Side: Brand & Context */}
+        <div className="lg:col-span-6 flex flex-col items-center lg:items-start text-center lg:text-left">
+          {/* Logo with proper aspect ratio */}
+          <div className="mb-6 p-4 bg-white rounded-2xl shadow-sm border border-[#e2e8f0] inline-flex items-center justify-center">
+            <img
+              src={logoUrl || DIRECT_LOGO_URL}
+              alt="Consentra Gestão SST"
+              className="h-16 sm:h-20 w-auto max-w-[260px] object-contain"
+              style={{ objectFit: 'contain', width: 'auto', maxHeight: '72px' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = DIRECT_LOGO_URL;
+              }}
+            />
+          </div>
+
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100/70 text-[#004328] border border-emerald-300/60 mb-3 inline-block">
+            Portal de Orçamentos & Gestão SST
+          </span>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0b1c30] tracking-tight leading-snug mb-3">
+            Acesso Restrito ao Sistema Corporativo
+          </h1>
+
+          <p className="text-sm text-[#49607e] leading-relaxed max-w-md mb-6">
+            Ambiente exclusivo para emissão técnica de orçamentos, propostas de SST, geração de Ordens de Serviço e contabilização em cascata nos dashboards.
+          </p>
+
+          {/* Quick info badges */}
+          <div className="grid grid-cols-2 gap-3 w-full max-w-md text-left">
+            <div className="p-3 bg-white rounded-xl border border-[#e2e8f0] shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#004328] mb-1">
+                <span className="material-symbols-outlined text-[16px]">verified_user</span>
+                <span>Assinatura Digital</span>
+              </div>
+              <p className="text-[11px] text-[#64748b]">Vinculada aos responsáveis técnicos cadastrados.</p>
+            </div>
+            <div className="p-3 bg-white rounded-xl border border-[#e2e8f0] shadow-2xs">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-[#004328] mb-1">
+                <span className="material-symbols-outlined text-[16px]">lock_clock</span>
+                <span>Ordens de Serviço</span>
+              </div>
+              <p className="text-[11px] text-[#64748b]">Geração sem valores financeiros para campo.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side: Login Card */}
+        <div className="lg:col-span-6 w-full max-w-md mx-auto">
+          <div className="bg-white rounded-3xl shadow-xl border border-[#e2e8f0] p-6 sm:p-8">
+            
+            <div className="flex items-center justify-between pb-4 mb-5 border-b border-[#f1f5f9]">
+              <div>
+                <h2 className="text-lg font-bold text-[#0b1c30]">
+                  {isRegisterMode ? 'Cadastrar Novo Acesso' : 'Identificação de Usuário'}
+                </h2>
+                <p className="text-xs text-[#64748b]">
+                  {isRegisterMode ? 'Informe os dados do colaborador' : 'Entre com seu e-mail e senha de acesso'}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-[#eff4ff] text-[#004328] flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined text-[20px]">
+                  {isRegisterMode ? 'person_add' : 'key'}
+                </span>
+              </div>
+            </div>
+
+            {errorMsg && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
+            {!isRegisterMode ? (
+              /* Formulário de Login */
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1.5">
+                    E-mail ou Nome do Usuário
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] text-[18px]">
+                      mail
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      value={identifier}
+                      onChange={(e) => {
+                        setIdentifier(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      placeholder="Digite seu e-mail ou nome de usuário"
+                      className="w-full h-11 pl-10 pr-4 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328] focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-[#0b1c30]">
+                      Senha de Acesso
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleOpenForgot}
+                      className="text-[11px] font-semibold text-[#004328] hover:underline"
+                    >
+                      Esqueceu a senha? Recuperar via e-mail
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] text-[18px]">
+                      lock
+                    </span>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (errorMsg) setErrorMsg(null);
+                      }}
+                      placeholder="Digite sua senha de acesso"
+                      className="w-full h-11 pl-10 pr-10 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328] focus:border-transparent transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#0b1c30] p-1"
+                      title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {showPassword ? 'visibility_off' : 'visibility'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-[#49607e] py-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#004328] focus:ring-[#004328] accent-[#004328]"
+                    />
+                    <span>Lembrar meu acesso neste navegador</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-11 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all active:scale-[0.99] disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Verificando credenciais...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[18px]">login</span>
+                      <span>Entrar no Sistema</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Alternar para cadastro */}
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsRegisterMode(true)}
+                    className="text-xs font-semibold text-[#49607e] hover:text-[#004328] transition-colors"
+                  >
+                    Novo na equipe? <strong className="text-[#004328] underline">Cadastrar novo usuário</strong>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Formulário de Registro */
+              <form onSubmit={handleRegister} className="flex flex-col gap-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Nome Completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Ex: João Victor Silva"
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    E-mail Corporativo
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    placeholder="Ex: joao.silva@consentra.com.br"
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                      Função / Perfil
+                    </label>
+                    <select
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value as any)}
+                      className="w-full h-10 px-2.5 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                    >
+                      <option value="Responsável Técnico">Responsável Técnico</option>
+                      <option value="Comercial">Comercial</option>
+                      <option value="Administrador">Administrador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                      Registro (CREA/CRM/MTE)
+                    </label>
+                    <input
+                      type="text"
+                      value={newDoc}
+                      onChange={(e) => setNewDoc(e.target.value)}
+                      placeholder="Ex: CREA-SP 123.456"
+                      className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Senha Provisória
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={newPass}
+                    onChange={(e) => setNewPass(e.target.value)}
+                    placeholder="Mínimo 3 caracteres"
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div className="pt-2 flex flex-col gap-2">
+                  <button
+                    type="submit"
+                    className="w-full h-10 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.99]"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+                    <span>Criar Conta e Entrar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRegisterMode(false)}
+                    className="w-full h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-[#49607e] text-xs font-semibold transition-colors"
+                  >
+                    Voltar para Login
+                  </button>
+                </div>
+              </form>
+            )}
+
+          </div>
+        </div>
+      </div>
+
+      {/* Footer copyright */}
+      <div className="w-full max-w-5xl py-4 text-center text-xs text-[#94a3b8]">
+        Consentra Gestão em Segurança e Saúde do Trabalho • Sistema de Orçamentos e O.S. Protegido
+      </div>
+
+      {/* Modal Esqueci a Senha / Recuperar via E-mail */}
+      {showForgotModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e2e8f0] relative animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+              title="Fechar"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-xl bg-emerald-50 text-[#004328] flex items-center justify-center shrink-0 border border-emerald-100">
+                <span className="material-symbols-outlined text-[24px]">mark_email_read</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-[#0b1c30]">Recuperar Senha por E-mail</h3>
+                <p className="text-[11px] text-[#64748b]">Acesso aos usuários do sistema Consentra SST</p>
+              </div>
+            </div>
+
+            {recoveryError && (
+              <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px] shrink-0">error</span>
+                <span>{recoveryError}</span>
+              </div>
+            )}
+
+            {recoveryStep === 'email' && (
+              <form onSubmit={handleRequestRecoveryEmail} className="flex flex-col gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Digite seu e-mail corporativo cadastrado:
+                  </label>
+                  <p className="text-[11px] text-[#64748b] mb-2">
+                    Enviaremos um código de verificação para que você possa redefinir sua senha com segurança.
+                  </p>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94a3b8] text-[18px]">
+                      mail
+                    </span>
+                    <input
+                      type="email"
+                      required
+                      value={recoveryEmail}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
+                      placeholder="seu.email@consentra.com.br"
+                      className="w-full h-11 pl-10 pr-4 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-100 text-[11px] text-emerald-900 flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-emerald-700 shrink-0 mt-0.5">info</span>
+                  <span>
+                    Qualquer colaborador ou administrador com e-mail corporativo cadastrado pode solicitar o código de recuperação instantaneamente.
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(false)}
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={recoveryLoading}
+                    className="px-5 py-2.5 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50"
+                  >
+                    {recoveryLoading ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>Enviando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[16px]">send</span>
+                        <span>Enviar Código</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {recoveryStep === 'code' && (
+              <form onSubmit={handleConfirmRecovery} className="flex flex-col gap-3.5">
+                {simulatedCode && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      <span>Código de recuperação enviado para {recoveryEmail}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 bg-white p-2 rounded-lg border border-emerald-200">
+                      <span className="text-[11px] text-slate-600">Código gerado (demonstração):</span>
+                      <span className="font-mono font-black text-sm text-[#004328] tracking-widest">{simulatedCode}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Código de 6 dígitos recebido:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={recoveryCodeInput}
+                    onChange={(e) => setRecoveryCodeInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Ex: 582910"
+                    className="w-full h-11 px-4 text-center font-mono font-bold tracking-widest text-base rounded-xl bg-[#f8fafc] text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Nova Senha de Acesso:
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={recoveryNewPass}
+                    onChange={(e) => setRecoveryNewPass(e.target.value)}
+                    placeholder="Mínimo 3 caracteres"
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0b1c30] mb-1">
+                    Confirmar Nova Senha:
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    value={recoveryConfirmPass}
+                    onChange={(e) => setRecoveryConfirmPass(e.target.value)}
+                    placeholder="Repita a nova senha"
+                    className="w-full h-10 px-3 rounded-xl bg-[#f8fafc] text-xs text-[#0b1c30] border border-[#cbd5e1] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#004328]"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setRecoveryStep('email')}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-medium"
+                  >
+                    Voltar / Trocar E-mail
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={recoveryLoading}
+                    className="px-5 py-2.5 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">lock_reset</span>
+                    <span>Redefinir Senha</span>
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {recoveryStep === 'success' && (
+              <div className="flex flex-col items-center text-center py-2">
+                <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
+                  <span className="material-symbols-outlined text-[32px]">task_alt</span>
+                </div>
+                <h4 className="text-base font-bold text-[#0b1c30] mb-1">Senha Atualizada com Sucesso!</h4>
+                <p className="text-xs text-[#64748b] max-w-xs mb-5">
+                  Sua nova senha já está ativa para o e-mail <strong>{recoveryEmail}</strong>. Seus novos dados foram salvos.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(false)}
+                  className="w-full h-11 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <span className="material-symbols-outlined text-[18px]">login</span>
+                  <span>Acessar o Sistema Agora</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
