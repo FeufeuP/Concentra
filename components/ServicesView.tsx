@@ -1,16 +1,35 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { CATALOG_SERVICES } from '@/lib/mock-data';
 import { CatalogService } from '@/lib/types';
 
 interface ServicesViewProps {
+  /** Catálogo persistido (Supabase ou localStorage), mantido pela página. */
+  services: CatalogService[];
+  /** Grava o serviço; retorna false em caso de falha (o erro já é exibido pela página). */
+  onSaveService: (service: CatalogService, isNew: boolean) => Promise<boolean>;
+  onDeleteService: (serviceId: string) => Promise<boolean>;
+  canEdit?: boolean;
   onSelectServiceForNewQuote?: (service: CatalogService) => void;
 }
 
-export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNewQuote }) => {
-  // State for services list (editable in session)
-  const [services, setServices] = useState<CatalogService[]>(CATALOG_SERVICES);
+function nextServiceCode(services: CatalogService[]): string {
+  const max = services.reduce((acc, s) => {
+    const n = parseInt(String(s.code || '').replace(/\D/g, ''), 10);
+    return Number.isFinite(n) && n > acc ? n : acc;
+  }, 0);
+  const next = max + 1;
+  return `#SRV-${next < 10 ? '0' : ''}${next}`;
+}
+
+export const ServicesView: React.FC<ServicesViewProps> = ({
+  services,
+  onSaveService,
+  onDeleteService,
+  canEdit = true,
+  onSelectServiceForNewQuote,
+}) => {
+  const [isPersisting, setIsPersisting] = useState<boolean>(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
@@ -151,10 +170,11 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
   };
 
   // Save Service from Drawer
-  const handleSaveDrawer = (e: React.FormEvent) => {
+  const handleSaveDrawer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPersisting) return;
     if (!formTitle.trim()) {
-      alert('Por favor, informe o nome do serviço.');
+      showToast('Por favor, informe o nome do serviço.');
       return;
     }
 
@@ -175,7 +195,10 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
         status: 'Ativo'
       };
 
-      setServices(prev => prev.map(s => s.id === editingService.id ? updated : s));
+      setIsPersisting(true);
+      const ok = await onSaveService(updated, false);
+      setIsPersisting(false);
+      if (!ok) return;
       showToast(`Serviço ${formCode} atualizado com sucesso!`);
     } else {
       // Create new
@@ -195,7 +218,10 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
         status: 'Ativo'
       };
 
-      setServices(prev => [created, ...prev]);
+      setIsPersisting(true);
+      const ok = await onSaveService(created, true);
+      setIsPersisting(false);
+      if (!ok) return;
       showToast(`Novo serviço ${formCode} cadastrado no catálogo!`);
     }
 
@@ -203,9 +229,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
   };
 
   // Duplicate Service
-  const handleDuplicate = (service: CatalogService) => {
-    const nextCodeNum = services.length + 1;
-    const nextCode = `#SRV-${nextCodeNum < 10 ? '0' : ''}${nextCodeNum}`;
+  const handleDuplicate = async (service: CatalogService) => {
+    const nextCode = nextServiceCode(services);
     const duplicated: CatalogService = {
       ...service,
       id: `srv-${Date.now()}`,
@@ -214,14 +239,16 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
       status: 'Ativo'
     };
 
-    setServices(prev => [duplicated, ...prev]);
+    const ok = await onSaveService(duplicated, true);
+    if (!ok) return;
     showToast(`Serviço duplicado como ${nextCode}!`);
   };
 
   // Delete Service
-  const handleDelete = (serviceId: string, title: string) => {
+  const handleDelete = async (serviceId: string, title: string) => {
     if (window.confirm(`Tem certeza que deseja remover o serviço "${title}" do catálogo?`)) {
-      setServices(prev => prev.filter(s => s.id !== serviceId));
+      const ok = await onDeleteService(serviceId);
+      if (!ok) return;
       setSelectedIds(prev => prev.filter(id => id !== serviceId));
       showToast(`Serviço removido com sucesso.`);
     }
@@ -295,6 +322,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
               <span>Importar / Exportar</span>
             </button>
 
+{canEdit && (
             <button
               onClick={handleOpenNewDrawer}
               type="button"
@@ -303,6 +331,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
               <span className="material-symbols-outlined text-[18px]">add_box</span>
               <span>Novo Serviço / Item</span>
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -617,6 +646,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
                             </button>
                           )}
 
+                          {canEdit && (
+                          <>
                           <button
                             onClick={() => handleOpenEditDrawer(service)}
                             className="p-1.5 rounded-lg text-[#49607e] hover:text-[#004328] hover:bg-[#eff4ff] transition-colors"
@@ -643,6 +674,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
                           >
                             <span className="material-symbols-outlined text-[18px]">delete</span>
                           </button>
+                          </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -924,10 +957,11 @@ export const ServicesView: React.FC<ServicesViewProps> = ({ onSelectServiceForNe
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-6 h-11 rounded-xl bg-[#0d5c3a] text-white text-xs font-semibold hover:bg-[#004328] shadow-md transition-all cursor-pointer"
+              disabled={isPersisting}
+              className="flex items-center gap-1.5 px-6 h-11 rounded-xl bg-[#0d5c3a] text-white text-xs font-semibold hover:bg-[#004328] shadow-md transition-all cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
-              <span className="material-symbols-outlined text-[18px]">save</span>
-              <span>{editingService ? 'Salvar Alterações' : 'Cadastrar Serviço'}</span>
+              <span className={`material-symbols-outlined text-[18px] ${isPersisting ? 'animate-spin' : ''}`}>{isPersisting ? 'sync' : 'save'}</span>
+              <span>{isPersisting ? 'Salvando...' : editingService ? 'Salvar Alterações' : 'Cadastrar Serviço'}</span>
             </button>
           </div>
         </form>

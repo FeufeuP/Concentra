@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Quote, QuoteItem, ClientData, QuoteStatus } from '@/lib/types';
-import { CATALOG_SERVICES, INITIAL_CLIENTS, DEFAULT_EMPTY_QUOTE } from '@/lib/mock-data';
+import { Quote, QuoteItem, ClientData, QuoteStatus, CatalogService } from '@/lib/types';
+import { DEFAULT_EMPTY_QUOTE } from '@/lib/mock-data';
 import { 
   CASCADING_STATUS_LIST, 
   CASCADING_MACRO_CATEGORIES, 
@@ -12,14 +12,17 @@ import {
 import { getStoredResponsibles } from '@/lib/responsibles';
 import { downloadQuotePdf } from '@/lib/pdf-generator';
 import { TabType } from './Sidebar';
-import { AuthUser, getCurrentUser } from '@/lib/auth';
+import { AuthUser, getCurrentUser, isAdminUser } from '@/lib/auth';
 import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
 import { getTodayFormatted, maskPhoneBR, calculateValidityDate } from '@/lib/masks';
 
 interface NewQuoteViewProps {
   initialQuote: Quote;
   clients: ClientData[];
-  onSaveQuote: (quote: Quote) => void;
+  /** Catálogo de serviços persistido (Supabase ou localStorage). */
+  catalog: CatalogService[];
+  /** Salva o orçamento; devolve a versão salva (com número definitivo) ou null se falhar. */
+  onSaveQuote: (quote: Quote) => Promise<Quote | null>;
   onPreviewPdf: (quote: Quote) => void;
   onSendEmail: (quote: Quote) => void;
   setActiveTab: (tab: TabType) => void;
@@ -37,6 +40,7 @@ function generateItemId(prefix = 'item'): string {
 export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   initialQuote,
   clients = [],
+  catalog = [],
   onSaveQuote,
   onPreviewPdf,
   onSendEmail,
@@ -49,8 +53,8 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   const [adminModalTab, setAdminModalTab] = useState<'header' | 'texts'>('header');
   const [adminToast, setAdminToast] = useState<string | null>(null);
 
-  const isAdmin = (currentUser?.role === 'Administrador') || 
-    (typeof window !== 'undefined' && getCurrentUser()?.role === 'Administrador');
+  const isAdmin = isAdminUser(currentUser || getCurrentUser());
+  const activeCatalog = catalog.filter((serv) => serv.status !== 'Inativo');
 
   // Lista dinâmica de responsáveis vinculada a Configurações (Item 4)
   const [responsiblesList, setResponsiblesList] = useState<string[]>(() => {
@@ -221,7 +225,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     updateQuoteTotals(newItems, quote.discount || 0, quote.installments || 1);
   };
 
-  const handleAddCatalogItem = (service: typeof CATALOG_SERVICES[0]) => {
+  const handleAddCatalogItem = (service: CatalogService) => {
     const currentItems = quote.items || [];
     const newItem: QuoteItem = {
       id: generateItemId('item'),
@@ -282,7 +286,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
       (currentUser?.name ? `${currentUser.name} (${currentUser.role || 'Responsável'})` : responsiblesList[0] || 'Washington Assis');
   };
 
-  const triggerSaveWithProgress = async (callback?: () => void) => {
+  const triggerSaveWithProgress = async (callback?: (saved: Quote) => void | Promise<void>) => {
     if (isSaving) return;
     setIsSaving(true);
     setSaveProgress(20);
@@ -290,11 +294,16 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     const quoteToSave = { ...quote, responsibleTech: currentResp };
     setQuote(quoteToSave);
 
-    await new Promise(r => setTimeout(r, 180));
     setSaveProgress(65);
-    onSaveQuote(quoteToSave);
+    const saved = await onSaveQuote(quoteToSave);
+    if (!saved) {
+      // Falha: a página já exibiu o erro; mantém as alterações no formulário
+      setIsSaving(false);
+      setSaveProgress(0);
+      return;
+    }
+    setQuote(saved);
 
-    await new Promise(r => setTimeout(r, 220));
     setSaveProgress(100);
     setSaveSuccess(true);
 
@@ -302,7 +311,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
       setIsSaving(false);
       setSaveProgress(0);
       setSaveSuccess(false);
-      if (callback) callback();
+      if (callback) void callback(saved);
     }, 450);
   };
 
@@ -311,11 +320,9 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
   };
 
   const handleGeneratePdf = () => {
-    const currentResp = getEffectiveResponsible();
-    const quoteToSave = { ...quote, responsibleTech: currentResp };
-    triggerSaveWithProgress(async () => {
-      await downloadQuotePdf(quoteToSave);
-      onPreviewPdf(quoteToSave);
+    triggerSaveWithProgress(async (saved) => {
+      await downloadQuotePdf(saved);
+      onPreviewPdf(saved);
     });
   };
 
@@ -324,8 +331,11 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
     const currentResp = getEffectiveResponsible();
     const quoteToSave = { ...quote, responsibleTech: currentResp };
     setQuote(quoteToSave);
-    onSaveQuote(quoteToSave);
-    await downloadQuotePdf(quoteToSave);
+    const saved = await onSaveQuote(quoteToSave);
+    if (saved) {
+      setQuote(saved);
+      await downloadQuotePdf(saved);
+    }
     setIsDownloadingPdf(false);
   };
 
@@ -1437,7 +1447,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
             </div>
 
             <div className="flex flex-col gap-2.5 py-4">
-              {CATALOG_SERVICES.filter(serv => {
+              {activeCatalog.filter(serv => {
                 if (!catalogSearch.trim()) return true;
                 const q = catalogSearch.toLowerCase();
                 return (
@@ -1452,7 +1462,7 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
                   Nenhum serviço regulatório encontrado para &quot;{catalogSearch}&quot;.
                 </div>
               ) : (
-                CATALOG_SERVICES.filter(serv => {
+                activeCatalog.filter(serv => {
                   if (!catalogSearch.trim()) return true;
                   const q = catalogSearch.toLowerCase();
                   return (

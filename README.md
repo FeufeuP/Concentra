@@ -128,8 +128,31 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...
 > A anon key é pública por natureza; a segurança vem das políticas RLS. **Nunca** coloque a
 > `service_role` key em variáveis `NEXT_PUBLIC_*`.
 
+> **Banco criado antes da Fase 3?** Execute [`supabase/upgrade_fase3.sql`](./supabase/upgrade_fase3.sql)
+> (idempotente). O `schema.sql` já contém tudo para instalações novas.
+
 **Tabelas:** `profiles` (ligada a `auth.users`), `clients`, `catalog_services`, `quotes`,
-`quote_items`, `app_settings`.
+`quote_items`, `app_settings`. **Storage:** bucket público `branding` (logotipo; escrita só admin).
+
+**Como os dados são gravados (modo Supabase):**
+
+| O quê | Onde | Quem pode alterar |
+|---|---|---|
+| Orçamentos e itens | `quotes` + `quote_items`, sempre juntos pela RPC `save_quote` (transação) | todos, exceto Auditor SST |
+| Número do orçamento | sequência `quote_number_seq` via RPC `next_quote_number()`, gerado no 1º salvamento (começa em 319) | todos, exceto Auditor SST |
+| "Zerar sistema" | RPC `clear_all_quotes('ZERAR')`, que não reinicia a numeração | só administradores |
+| Clientes e catálogo de serviços | `clients`, `catalog_services` | todos, exceto Auditor SST |
+| Dados da empresa, textos do PDF e logotipo | `app_settings` (`company_profile`, `quote_texts`, `logo_url`) + Storage | só administradores |
+| Responsáveis pelo orçamento | `app_settings.responsible_persons` | todos, exceto Auditor SST |
+
+O banco é a fonte da verdade: ao entrar, o app carrega tudo do servidor e não guarda orçamentos ou
+clientes no navegador. Toda gravação é confirmada pelo servidor; se falhar (sem permissão, sem
+conexão…), aparece um aviso vermelho e os dados são recarregados. Sem registro em `app_settings`,
+valem os padrões do código (`lib/mock-data.ts`, `lib/company.ts`).
+
+**Dados antigos do navegador:** se o sistema foi usado no modo local antes de conectar o Supabase,
+**Configurações** mostra o cartão *"Dados salvos somente neste navegador"* para importar orçamentos,
+clientes e configurações. Números já usados no servidor são renumerados, e é seguro repetir a importação.
 
 **Recuperação de senha:** o usuário recebe um link por e-mail e define a nova senha no próprio
 sistema. O SMTP padrão do Supabase só envia para membros da equipe do projeto e tem limite baixo
@@ -143,7 +166,7 @@ components/     telas e modais (Dashboard, Orçamentos, Novo Orçamento, PDF, Cl
 hooks/          hooks React
 lib/            regras de negócio: auth, acesso ao Supabase, gerador de PDF, máscaras, tipos, dados padrão
 public/         logos e favicons
-supabase/       schema SQL, políticas RLS, seed de usuários e Edge Function admin-users
+supabase/       schema SQL (+ upgrade_fase3.sql), políticas RLS, seed de usuários e Edge Function admin-users
 ```
 
 ## Roadmap

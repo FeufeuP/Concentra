@@ -140,21 +140,21 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 
 | # | Problema | Local | Impacto |
 |---|---|---|---|
-| B1 | Campos `customTexts`, `headerConfig` e `paymentNotes` existem em `Quote`, mas **não estão no schema nem no mapeamento** do Supabase | `lib/types.ts`, `lib/supabase.ts`, `supabase/schema.sql` | Perda de dados ao usar Supabase |
-| B2 | "Zerar sistema" (`handleClearAllQuotes`) limpa apenas o estado local; ao recarregar, os orçamentos **voltam do Supabase** | `app/page.tsx:260` | Comportamento enganoso |
-| B3 | `saveQuoteToSupabase` apaga os itens e reinsere **sem transação**; se o insert falhar, os itens somem (erro só no console) | `lib/supabase.ts:265` | Perda de dados |
-| B4 | Numeração de orçamentos parte de `318` fixo, com regra especial para `#319`; ids antigos com `#`, novos sem; não há sequência no banco | `app/page.tsx:183, 232, 340` | Números duplicados entre navegadores/usuários |
-| B5 | `handleSelectServiceForNewQuote` não persiste no Supabase | `app/page.tsx:365` | Alterações perdidas |
-| B6 | Catálogo de serviços existe só em memória (`useState(CATALOG_SERVICES)`); edições somem ao recarregar. A tabela `catalog_services` nunca é usada | `components/ServicesView.tsx:13` | Funcionalidade incompleta |
-| B7 | Carga do Supabase só substitui os dados locais se o remoto **não estiver vazio**; não há merge nem tratamento de conflito | `app/page.tsx` | Divergência silenciosa local × remoto |
-| B8 | Erros de gravação no Supabase são ignorados (`.catch(() => {})`) e o toast de sucesso aparece mesmo assim | `app/page.tsx` | Usuário não sabe que falhou |
-| B9 | Datas armazenadas como texto `dd/mm/aaaa` (`issue_date`, `validity_date`) | `supabase/schema.sql` | Ordenação/filtros incorretos no banco |
-| B10 | Seeds do SQL divergem do código (`user_washington` × `user-washington`; "Mariana Souza" × "Dra. Mariana Rios"; lista de responsáveis diferente de `lib/responsibles.ts`); dados da empresa também divergem (`app_settings` × `COMPANY_PROFILE`) | `supabase/schema.sql`, `lib/auth.ts`, `lib/mock-data.ts` | Inconsistência de dados |
+| B1 ✅ | **Resolvido (Fase 3).** Campos `customTexts`, `headerConfig` e `paymentNotes` existem em `Quote`, mas **não estão no schema nem no mapeamento** do Supabase | `lib/types.ts`, `lib/supabase.ts`, `supabase/schema.sql` | Perda de dados ao usar Supabase |
+| B2 ✅ | **Resolvido (Fase 3).** "Zerar sistema" (`handleClearAllQuotes`) limpa apenas o estado local; ao recarregar, os orçamentos **voltam do Supabase** | `app/page.tsx:260` | Comportamento enganoso |
+| B3 ✅ | **Resolvido (Fase 3).** `saveQuoteToSupabase` apaga os itens e reinsere **sem transação**; se o insert falhar, os itens somem (erro só no console) | `lib/supabase.ts:265` | Perda de dados |
+| B4 ✅ | **Resolvido (Fase 3).** Numeração de orçamentos parte de `318` fixo, com regra especial para `#319`; ids antigos com `#`, novos sem; não há sequência no banco | `app/page.tsx:183, 232, 340` | Números duplicados entre navegadores/usuários |
+| B5 ✅ | **Resolvido (Fase 3).** `handleSelectServiceForNewQuote` não persiste no Supabase | `app/page.tsx:365` | Alterações perdidas |
+| B6 ✅ | **Resolvido (Fase 3).** Catálogo de serviços existe só em memória (`useState(CATALOG_SERVICES)`); edições somem ao recarregar. A tabela `catalog_services` nunca é usada | `components/ServicesView.tsx:13` | Funcionalidade incompleta |
+| B7 ✅ | **Resolvido (Fase 3).** Carga do Supabase só substitui os dados locais se o remoto **não estiver vazio**; não há merge nem tratamento de conflito | `app/page.tsx` | Divergência silenciosa local × remoto |
+| B8 ✅ | **Resolvido (Fase 3).** Erros de gravação no Supabase são ignorados (`.catch(() => {})`) e o toast de sucesso aparece mesmo assim | `app/page.tsx` | Usuário não sabe que falhou |
+| B9 ✅ | **Resolvido (Fase 3).** Datas armazenadas como texto `dd/mm/aaaa` (`issue_date`, `validity_date`) | `supabase/schema.sql` | Ordenação/filtros incorretos no banco |
+| B10 ✅ | **Resolvido (Fases 2/3).** Seeds do SQL divergem do código (`user_washington` × `user-washington`; "Mariana Souza" × "Dra. Mariana Rios"; lista de responsáveis diferente de `lib/responsibles.ts`); dados da empresa também divergem (`app_settings` × `COMPANY_PROFILE`) | `supabase/schema.sql`, `lib/auth.ts`, `lib/mock-data.ts` | Inconsistência de dados |
 | B11 | Envio de e-mail é **simulado** (`setTimeout` + toast de "enviado") | `components/EmailModal.tsx:29` | Funcionalidade falsa |
 | B12 | Notificações fixas no código, incluindo "Sistema Conectado ao Supabase — Ativo" mesmo sem conexão | `components/Header.tsx:103` | Informação enganosa |
-| B13 | Logo customizado salvo como base64 no `localStorage` (limite ~5 MB) | `lib/logo.ts` | Pode estourar a cota e quebrar outras gravações |
-| B14 | Usuários nunca são sincronizados com o Supabase (funções existem mas não são chamadas) | `lib/supabase.ts` | Usuários existem só no navegador |
-| B15 | `process.env.VITE_*` não é exposto ao cliente no Next.js (apenas `NEXT_PUBLIC_*`) | `lib/supabase.ts:13-14` | Configuração confusa |
+| B13 ✅ | **Resolvido (Fase 3).** Logo customizado salvo como base64 no `localStorage` (limite ~5 MB) | `lib/logo.ts` | Pode estourar a cota e quebrar outras gravações |
+| B14 ✅ | **Resolvido (Fase 2).** Usuários nunca são sincronizados com o Supabase (funções existem mas não são chamadas) | `lib/supabase.ts` | Usuários existem só no navegador |
+| B15 ✅ | **Resolvido (Fase 2).** `process.env.VITE_*` não é exposto ao cliente no Next.js (apenas `NEXT_PUBLIC_*`) | `lib/supabase.ts:13-14` | Configuração confusa |
 | B16 | `alert()` / `confirm()` nativos misturados com toasts customizados | vários componentes | UX inconsistente |
 
 ---
@@ -182,8 +182,8 @@ Arquivos de 1 byte (apenas uma quebra de linha), criados provavelmente pelo uplo
 - Filtros para remover o usuário "Carlos Eduardo" espalhados em `auth.ts` e `responsibles.ts`.
 - Lista padrão de responsáveis repetida em `auth.ts`, `responsibles.ts`, `classification-data.ts` e no SQL.
 - Bloco de opções do `html2pdf` copiado 3× em `lib/pdf-generator.ts` (linhas ~338, ~381, ~424).
-- Lógica "próximo número de orçamento" repetida 3× em `app/page.tsx`.
-- Toast duplicado em `app/page.tsx` (tela de login e tela principal).
+- ~~Lógica "próximo número de orçamento" repetida 3× em `app/page.tsx`.~~ ✅ Unificada (Fase 3).
+- ~~Toast duplicado em `app/page.tsx` (tela de login e tela principal).~~ ✅ Unificado (Fase 3).
 - Tags `<link rel="icon">` duplicadas manualmente em `layout.tsx` além de `metadata.icons`.
 
 ### 6.4 Assets duplicados (mesmo hash MD5)
@@ -245,18 +245,19 @@ Além disso, há vários logos possivelmente não usados (`extracted_logo.png`, 
 - [ ] Trocar as senhas padrão (expostas no repositório público), quando o cliente decidir
 - [ ] Configurar SMTP próprio e o domínio de produção nas Redirect URLs do Supabase
 
-### Fase 3 — Dados e persistência
+### Fase 3 — Dados e persistência ✅
 
-- [ ] Adicionar ao schema: `custom_texts JSONB`, `header_config JSONB`, `payment_notes TEXT`
-- [ ] Converter `issue_date` / `validity_date` para `DATE`
-- [ ] Criar `SEQUENCE` (ou função RPC) para numeração de orçamentos; padronizar ids (sem `#`)
-- [ ] Gravar orçamento + itens em uma única função RPC (transação)
-- [ ] Persistir catálogo de serviços (`catalog_services`) e configurações (`app_settings`)
-- [ ] Sincronizar usuários/perfis
-- [ ] Fazer "Zerar sistema" também apagar no Supabase (com confirmação forte)
-- [ ] Exibir erro ao usuário quando a gravação remota falhar
-- [ ] Unificar seeds do SQL com os padrões do código
-- [ ] Mover logo customizado para Supabase Storage
+- [x] Adicionar ao schema: `custom_texts JSONB`, `header_config JSONB`, `payment_notes TEXT` (+ `created_by` / `updated_by`)
+- [x] Converter `issue_date` / `validity_date` para `DATE` (o app continua exibindo `dd/mm/aaaa`; a conversão fica em `lib/supabase.ts`)
+- [x] Criar `SEQUENCE` + RPC `next_quote_number()` (começa em 319); ids padronizados sem `#` (constraint no banco); `number_only` único
+- [x] Gravar orçamento + itens em uma única função RPC `save_quote()` (transação; RLS continua valendo)
+- [x] Persistir catálogo de serviços (`catalog_services`) e configurações (`app_settings`: empresa, textos do PDF, responsáveis, logotipo)
+- [x] Sincronizar usuários/perfis (feito na Fase 2 com Supabase Auth + `profiles`)
+- [x] "Zerar sistema" apaga no Supabase via RPC `clear_all_quotes('ZERAR')`: somente administradores, exige digitar ZERAR
+- [x] Exibir erro ao usuário quando a gravação remota falhar (toast vermelho + recarga dos dados do servidor)
+- [x] Unificar seeds do SQL com os padrões do código (catálogo = 12 serviços de `lib/mock-data.ts`; empresa/textos usam o padrão do código quando não há registro)
+- [x] Mover logo customizado para Supabase Storage (bucket público `branding`, escrita só admin, máx. 2 MB); no modo local, limite de 1 MB
+- [x] Importação dos dados que estavam só no navegador (orçamentos, clientes e configurações) em Configurações
 
 ### Fase 4 — Arquitetura e qualidade de código
 

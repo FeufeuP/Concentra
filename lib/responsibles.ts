@@ -1,3 +1,5 @@
+import { pushSetting, SETTING_KEYS } from './remote-sync';
+
 export const DEFAULT_RESPONSIBLES: string[] = [
   'Washington Assis',
   'Dra. Mariana Rios',
@@ -7,6 +9,7 @@ export const DEFAULT_RESPONSIBLES: string[] = [
 ];
 
 const STORAGE_KEY = 'consentra_quote_responsibles';
+export const RESPONSIBLES_STORAGE_KEY = STORAGE_KEY;
 
 export function getStoredResponsibles(): string[] {
   if (typeof window === 'undefined') {
@@ -40,6 +43,23 @@ export function saveStoredResponsibles(list: string[]): void {
     window.dispatchEvent(new CustomEvent('consentra_responsibles_updated', { detail: filtered }));
   } catch (err) {
     console.error('Erro ao salvar responsáveis no localStorage:', err);
+  }
+  pushSetting(SETTING_KEYS.responsibles, list.filter((n: string) => n !== 'Carlos Eduardo'));
+}
+
+/** Aplica a lista vinda do servidor (substitui o cache local, sem reenviar). */
+export function applyRemoteResponsibles(value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (Array.isArray(value) && value.length > 0) {
+      const list = value.filter((n): n is string => typeof n === 'string' && n.trim() !== '' && n !== 'Carlos Eduardo');
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    window.dispatchEvent(new CustomEvent('consentra_responsibles_updated', { detail: getStoredResponsibles() }));
+  } catch (err) {
+    console.error('Erro ao aplicar responsáveis do servidor:', err);
   }
 }
 

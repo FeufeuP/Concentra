@@ -1,4 +1,5 @@
 import { COMPANY_PROFILE, DIRECT_LOGO_URL } from './mock-data';
+import { pushSetting, SETTING_KEYS } from './remote-sync';
 
 export interface CompanyProfile {
   name: string;
@@ -91,6 +92,7 @@ export function saveStoredCompanyProfile(profile: Partial<CompanyProfile>): Comp
     } catch (e) {
       console.error('Erro ao salvar perfil da empresa:', e);
     }
+    pushSetting(SETTING_KEYS.companyProfile, updated);
   }
   return updated;
 }
@@ -101,6 +103,7 @@ export function resetStoredCompanyProfile(): CompanyProfile {
       localStorage.removeItem(STORAGE_PROFILE_KEY);
       window.dispatchEvent(new CustomEvent('consentra_company_profile_updated', { detail: COMPANY_PROFILE }));
     } catch {}
+    pushSetting(SETTING_KEYS.companyProfile, null);
   }
   return COMPANY_PROFILE;
 }
@@ -129,6 +132,7 @@ export function saveStoredQuoteTexts(texts: Partial<QuoteTextsConfig>): QuoteTex
     } catch (e) {
       console.error('Erro ao salvar textos do orçamento:', e);
     }
+    pushSetting(SETTING_KEYS.quoteTexts, updated);
   }
   return updated;
 }
@@ -139,6 +143,51 @@ export function resetStoredQuoteTexts(): QuoteTextsConfig {
       localStorage.removeItem(STORAGE_QUOTE_TEXTS_KEY);
       window.dispatchEvent(new CustomEvent('consentra_quote_texts_updated', { detail: DEFAULT_QUOTE_TEXTS }));
     } catch {}
+    pushSetting(SETTING_KEYS.quoteTexts, null);
   }
   return DEFAULT_QUOTE_TEXTS;
+}
+
+// ------------------------------------------------------------------------------
+// Aplicação de valores vindos do servidor (substitui o cache local, sem reenviar)
+// ------------------------------------------------------------------------------
+
+export const COMPANY_PROFILE_STORAGE_KEY = STORAGE_PROFILE_KEY;
+export const QUOTE_TEXTS_STORAGE_KEY = STORAGE_QUOTE_TEXTS_KEY;
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** `null` = sem personalização no servidor (usa o padrão do sistema). */
+export function applyRemoteCompanyProfile(value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (isPlainObject(value)) {
+      const profile = { ...COMPANY_PROFILE, ...value } as CompanyProfile;
+      localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(profile));
+      window.dispatchEvent(new CustomEvent('consentra_company_profile_updated', { detail: profile }));
+    } else {
+      localStorage.removeItem(STORAGE_PROFILE_KEY);
+      window.dispatchEvent(new CustomEvent('consentra_company_profile_updated', { detail: COMPANY_PROFILE }));
+    }
+  } catch (e) {
+    console.error('Erro ao aplicar perfil da empresa do servidor:', e);
+  }
+}
+
+export function applyRemoteQuoteTexts(value: unknown): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (isPlainObject(value)) {
+      const texts = { ...DEFAULT_QUOTE_TEXTS, ...value } as QuoteTextsConfig;
+      localStorage.setItem(STORAGE_QUOTE_TEXTS_KEY, JSON.stringify(texts));
+      window.dispatchEvent(new CustomEvent('consentra_quote_texts_updated', { detail: texts }));
+    } else {
+      localStorage.removeItem(STORAGE_QUOTE_TEXTS_KEY);
+      window.dispatchEvent(new CustomEvent('consentra_quote_texts_updated', { detail: DEFAULT_QUOTE_TEXTS }));
+    }
+  } catch (e) {
+    console.error('Erro ao aplicar textos do orçamento do servidor:', e);
+  }
 }

@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { COMPANY_PROFILE, DIRECT_LOGO_URL } from '@/lib/mock-data';
 import { getStoredCompanyProfile, saveStoredCompanyProfile, CompanyProfile } from '@/lib/company';
 import { getStoredResponsibles, saveStoredResponsibles, DEFAULT_RESPONSIBLES } from '@/lib/responsibles';
-import { getStoredLogoUrl, saveStoredLogoUrl, clearStoredLogoUrl, DEFAULT_REAL_LOGO_URL, DEFAULT_LOGO_URL } from '@/lib/logo';
-import { AuthUser, UserRole, USER_ROLES, listUsers, createUserAccount, adminResetPassword, deleteUserAccount, getCurrentUser, isAdminUser, MIN_PASSWORD_LENGTH } from '@/lib/auth';
+import { getStoredLogoUrl, saveStoredLogoUrl, clearStoredLogoUrl, DEFAULT_REAL_LOGO_URL, DEFAULT_LOGO_URL, MAX_LOCAL_LOGO_BYTES } from '@/lib/logo';
+import { isSupabaseConfigured, uploadLogoToStorage } from '@/lib/supabase';
+import { LocalDataImportCard } from './LocalDataImportCard';
+import { AuthUser, UserRole, USER_ROLES, listUsers, createUserAccount, adminResetPassword, deleteUserAccount, getCurrentUser, isAdminUser, canWrite, MIN_PASSWORD_LENGTH } from '@/lib/auth';
 import { Quote, ClientData } from '@/lib/types';
 import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -17,8 +19,9 @@ interface SettingsViewProps {
   currentUser?: AuthUser | null;
   quotes?: Quote[];
   clients?: ClientData[];
-  onShowToast?: (msg: string) => void;
-  onClearAllQuotes?: () => void;
+  onShowToast?: (msg: string, type?: 'success' | 'error') => void;
+  /** Chamado após importar dados locais para o servidor (recarrega os dados). */
+  onDataImported?: () => void;
 }
 
 interface SectionSaveButtonProps {
@@ -97,7 +100,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   quotes = [],
   clients = [],
   onShowToast,
-  onClearAllQuotes,
+  onDataImported,
 }) => {
   const [profile, setProfile] = useState<CompanyProfile>(() => getStoredCompanyProfile());
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -124,11 +127,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // Modal de edição de dados de usuário
   const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
 
-  // Modal de confirmação de limpeza/zerar orçamentos
-  const [showClearQuotesModal, setShowClearQuotesModal] = useState<boolean>(false);
-  const [isClearingQuotes, setIsClearingQuotes] = useState<boolean>(false);
-  const [clearingProgress, setClearingProgress] = useState<number>(0);
-
   // Controle de Modais Administrativos e Segurança
   const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
   const [adminModalTab, setAdminModalTab] = useState<'header' | 'texts'>('header');
@@ -136,6 +134,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const activeUser = currentUser || (typeof window !== 'undefined' ? getCurrentUser() : null);
   const isAdmin = isAdminUser(activeUser);
+  const remoteMode = isSupabaseConfigured();
+  const userCanWrite = canWrite(activeUser);
+
+  // No modo Supabase, dados da empresa, textos e logotipo são exclusivos de administradores (RLS)
+  const ensureCanEditCompany = (): boolean => {
+    if (!remoteMode || isAdmin) return true;
+    if (onShowToast) onShowToast('Somente administradores podem alterar os dados da empresa, textos e logotipo.', 'error');
+    return false;
+  };
+  const ensureCanEditResponsibles = (): boolean => {
+    if (userCanWrite) return true;
+    if (onShowToast) onShowToast('Seu perfil (Auditor SST) tem acesso somente leitura.', 'error');
+    return false;
+  };
 
   const refreshUsers = async () => {
     setUsersList(await listUsers());
@@ -178,36 +190,73 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [logoUploadMsg, setLogoUploadMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogoFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const [isUploadingLogo, setIsUploadingLogo] = useState<boolean>(false);
 
-    if (!file.type.startsWith('image/')) {
-      alert('Por favor, selecione um arquivo de imagem válido (PNG, JPG, SVG, WebP).');
+  const flashLogoMsg = (msg: string) => {
+    setLogoUploadMsg(msg);
+    setTimeout(() => setLogoUploadMsg(null), 4000);
+  };
+
+  const handleLogoFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Permite selecionar o mesmo arquivo novamente
+    e.target.value = '';
+    if (!file) return;
+    if (!ensureCanEditCompany()) return;
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      onShowToast?.('Selecione uma imagem PNG, JPG ou WebP.', 'error');
       return;
     }
 
+    if (remoteMode) {
+      setIsUploadingLogo(true);
+      const res = await uploadLogoToStorage(file);
+      setIsUploadingLogo(false);
+      if (!res.success) {
+        onShowToast?.(`Logotipo não enviado: ${res.error}`, 'error');
+        return;
+      }
+      saveStoredLogoUrl(res.data);
+      setActiveLogo(res.data);
+      flashLogoMsg('Logotipo enviado ao servidor! Aplicado em todos os orçamentos e Ordens de Serviço.');
+      return;
+    }
+
+    // Modo local: base64 no navegador (limite para não estourar a cota do localStorage)
+    if (file.size > MAX_LOCAL_LOGO_BYTES) {
+      onShowToast?.('Arquivo muito grande para salvar no navegador (máximo 1 MB). Reduza a imagem e tente novamente.', 'error');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
-      if (dataUrl) {
-        saveStoredLogoUrl(dataUrl);
-        setActiveLogo(dataUrl);
-        setLogoUploadMsg('Logotipo importado com sucesso! Aplicado em todos os orçamentos e Ordens de Serviço.');
-        setTimeout(() => setLogoUploadMsg(null), 4000);
+      if (!dataUrl) return;
+      if (!saveStoredLogoUrl(dataUrl)) {
+        onShowToast?.('Não foi possível salvar o logotipo: armazenamento do navegador cheio.', 'error');
+        return;
       }
+      setActiveLogo(dataUrl);
+      flashLogoMsg('Logotipo importado com sucesso! Aplicado em todos os orçamentos e Ordens de Serviço.');
     };
     reader.readAsDataURL(file);
-    // Reset file input value so same file can be reselected
-    e.target.value = '';
   };
 
   const handleResetLogo = () => {
+    if (!ensureCanEditCompany()) return;
     clearStoredLogoUrl();
     setActiveLogo(DEFAULT_LOGO_URL);
-    setLogoUploadMsg('Logotipo restaurado para a versão oficial real padrão.');
-    setTimeout(() => setLogoUploadMsg(null), 4000);
+    flashLogoMsg('Logotipo restaurado para a versão oficial real padrão.');
   };
+
+  useEffect(() => {
+    const onLogo = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      setActiveLogo(detail || DEFAULT_LOGO_URL);
+    };
+    window.addEventListener('consentra_logo_updated', onLogo);
+    return () => window.removeEventListener('consentra_logo_updated', onLogo);
+  }, []);
 
   useEffect(() => {
     const handleResponsiblesUpdate = (e: Event) => {
@@ -239,6 +288,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleAddPerson = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ensureCanEditResponsibles()) return;
     const trimmed = newPersonName.trim();
     if (!trimmed) return;
 
@@ -256,6 +306,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleRemovePerson = (nameToRemove: string) => {
+    if (!ensureCanEditResponsibles()) return;
     if (responsibles.length <= 1) {
       alert('Deve haver pelo menos um responsável cadastrado no sistema.');
       return;
@@ -275,6 +326,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSaveEdit = (index: number) => {
+    if (!ensureCanEditResponsibles()) return;
     const trimmed = editingName.trim();
     if (!trimmed) return;
     const updated = [...responsibles];
@@ -288,6 +340,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleResetDefault = () => {
+    if (!ensureCanEditResponsibles()) return;
     if (confirm('Deseja restaurar os responsáveis padrão do sistema?')) {
       setResponsibles(DEFAULT_RESPONSIBLES);
       saveStoredResponsibles(DEFAULT_RESPONSIBLES);
@@ -314,6 +367,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // 1. Identificação da Empresa Emissora
   const handleSaveSection1 = () => {
+    if (!ensureCanEditCompany()) return;
     triggerSectionSave('sec-1', () => {
       const saved = saveStoredCompanyProfile(profile);
       setProfile(saved);
@@ -322,6 +376,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // 2. Responsável Técnico & Emissão de ART
   const handleSaveSection2 = () => {
+    if (!ensureCanEditCompany()) return;
     triggerSectionSave('sec-2', () => {
       const saved = saveStoredCompanyProfile(profile);
       setProfile(saved);
@@ -330,6 +385,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // 3. Dados Bancários para Pagamentos & PIX
   const handleSaveSection3 = () => {
+    if (!ensureCanEditCompany()) return;
     triggerSectionSave('sec-3', () => {
       const saved = saveStoredCompanyProfile(profile);
       setProfile(saved);
@@ -338,6 +394,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   // 4. Responsável pelo Orçamento
   const handleSaveSection4 = () => {
+    if (!ensureCanEditResponsibles()) return;
     triggerSectionSave('sec-4', () => {
       saveStoredResponsibles(responsibles);
       if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(responsibles);
@@ -410,25 +467,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setResetPassProgress(0);
   };
 
-  const handleConfirmClearQuotes = () => {
-    setIsClearingQuotes(true);
-    setClearingProgress(25);
-    setTimeout(() => setClearingProgress(65), 140);
-    setTimeout(() => setClearingProgress(90), 280);
-    setTimeout(() => {
-      setClearingProgress(100);
-      if (onClearAllQuotes) {
-        onClearAllQuotes();
-      }
-      setIsClearingQuotes(false);
-      setShowClearQuotesModal(false);
-      setClearingProgress(0);
-      if (onShowToast) {
-        onShowToast('Todos os orçamentos foram apagados. Sistema zerado com sucesso!');
-      }
-    }, 450);
-  };
-
   const handleRemoveUser = async (userId: string, userName: string) => {
     if (currentUser?.id === userId) {
       alert('Você não pode excluir sua própria conta atualmente em uso.');
@@ -446,6 +484,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!ensureCanEditCompany()) return;
     triggerSectionSave('global', () => {
       // 1. Salvar dados cadastrais e bancários da empresa
       const saved = saveStoredCompanyProfile(profile);
@@ -486,6 +525,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         )}
       </div>
 
+      {remoteMode && (
+        <LocalDataImportCard
+          isAdmin={isAdmin}
+          canWrite={userCanWrite}
+          onShowToast={onShowToast}
+          onImported={onDataImported}
+        />
+      )}
+
+      {remoteMode && !isAdmin && (
+        <div className="p-3 rounded-xl bg-[#eff4ff] border border-[#c4dcff]/60 text-xs text-[#49607e] flex items-start gap-2">
+          <span className="material-symbols-outlined text-[18px] text-[#004328] shrink-0">lock</span>
+          <span>
+            Dados da empresa, textos padrão do PDF e logotipo são compartilhados por toda a equipe e só podem ser alterados por administradores.
+          </span>
+        </div>
+      )}
+
       {/* Official Brand Identity & Logomarca Banner */}
       <div className="p-6 rounded-2xl bg-white border border-[#e5eeff] shadow-[0_1px_4px_rgba(0,0,0,0.03)] flex flex-col gap-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#eff4ff] gap-3">
@@ -500,15 +557,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-1.5 rounded-xl bg-[#004328] hover:bg-[#00331e] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs"
+              disabled={isUploadingLogo}
+              className="px-3.5 py-1.5 rounded-xl bg-[#004328] hover:bg-[#00331e] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0 shadow-2xs disabled:opacity-60 disabled:cursor-wait"
             >
-              <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              <span>Importar Logotipo Correto</span>
+              <span className={`material-symbols-outlined text-[16px] ${isUploadingLogo ? 'animate-spin' : ''}`}>{isUploadingLogo ? 'sync' : 'upload_file'}</span>
+              <span>{isUploadingLogo ? 'Enviando...' : 'Importar Logotipo Correto'}</span>
             </button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/webp"
+              accept="image/png,image/jpeg,image/webp"
               onChange={handleLogoFileUpload}
               className="hidden"
             />
