@@ -1,5 +1,13 @@
 # Consentra · Gestão de SST
 
+[![Site](https://img.shields.io/badge/site-feufeup.github.io%2FConcentra-1f6feb?logo=githubpages&logoColor=white)](https://feufeup.github.io/Concentra/)
+[![Release](https://img.shields.io/github/v/release/FeufeuP/Concentra?label=release&color=2ea043)](https://github.com/FeufeuP/Concentra/releases/latest)
+[![CI](https://github.com/FeufeuP/Concentra/actions/workflows/ci.yml/badge.svg)](https://github.com/FeufeuP/Concentra/actions/workflows/ci.yml)
+[![Deploy](https://github.com/FeufeuP/Concentra/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/FeufeuP/Concentra/actions/workflows/deploy-pages.yml)
+[![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-3fb950)](./LICENSE)
+
+**🌐 Site:** <https://feufeup.github.io/Concentra/> · **📦 Última versão:** [v2.4.0](https://github.com/FeufeuP/Concentra/releases/latest)
+
 Sistema web para **emissão de orçamentos e propostas técnicas de Saúde e Segurança do Trabalho (SST)**,
 com pipeline comercial, cadastro de clientes, catálogo de serviços (NRs, laudos, treinamentos, eSocial),
 relatórios e geração de PDF.
