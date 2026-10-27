@@ -72,6 +72,8 @@ interface CatalogRow {
   status: string | null;
   deliverables: string[] | null;
   quick_select: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 interface ClientRow {
@@ -561,8 +563,12 @@ export async function saveClientToSupabase(c: ClientData): Promise<{ success: bo
   if (!client) return { success: false, error: 'Supabase não conectado.' };
 
   try {
-    const { error } = await client.from('clients').upsert(clientToPayload(c), { onConflict: 'id' });
+    // Confirmação de gravação (mesma regra do catálogo): 0 linhas = não salvou.
+    const { data, error } = await client.from('clients').upsert(clientToPayload(c), { onConflict: 'id' }).select('id');
     if (error) return { success: false, error: friendlyDbError(error) };
+    if (!data || data.length === 0) {
+      return { success: false, error: 'O cliente não foi gravado no servidor (sem permissão para o seu perfil).' };
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao salvar cliente.') };
@@ -620,6 +626,26 @@ function rowToCatalog(r: CatalogRow): CatalogService {
     status: r.status === 'Inativo' ? 'Inativo' : 'Ativo',
     deliverables: r.deliverables || [],
     quickSelect: Boolean(r.quick_select),
+    createdAt: r.created_at || undefined,
+    updatedAt: r.updated_at || undefined,
+  };
+}
+
+/** Serviço do app → linha do banco (snake_case). */
+export function catalogToPayload(s: CatalogService) {
+  return {
+    id: s.id,
+    code: s.code || null,
+    title: s.title,
+    subtitle: s.subtitle || null,
+    description: s.description || '',
+    unit: s.unit || 'Unidade',
+    suggested_price: Number(s.suggestedPrice) || 0,
+    nr_category: s.nrCategory || '',
+    category: s.category || null,
+    status: s.status || 'Ativo',
+    deliverables: s.deliverables || [],
+    quick_select: Boolean(s.quickSelect),
   };
 }
 
@@ -639,24 +665,17 @@ export async function saveCatalogService(s: CatalogService): Promise<{ success: 
   const client = getSupabaseClient();
   if (!client) return { success: false, error: 'Supabase não conectado.' };
   try {
-    const { error } = await client.from('catalog_services').upsert(
-      {
-        id: s.id,
-        code: s.code || null,
-        title: s.title,
-        subtitle: s.subtitle || null,
-        description: s.description || '',
-        unit: s.unit || 'Unidade',
-        suggested_price: Number(s.suggestedPrice) || 0,
-        nr_category: s.nrCategory || '',
-        category: s.category || null,
-        status: s.status || 'Ativo',
-        deliverables: s.deliverables || [],
-        quick_select: Boolean(s.quickSelect),
-      },
-      { onConflict: 'id' }
-    );
+    // `.select('id')` é a confirmação de gravação: sem ele, um upsert barrado
+    // silenciosamente pelo RLS (0 linhas) era tratado como sucesso e o serviço
+    // "salvava" na tela, mas não existia no banco ao recarregar.
+    const { data, error } = await client
+      .from('catalog_services')
+      .upsert(catalogToPayload(s), { onConflict: 'id' })
+      .select('id');
     if (error) return { success: false, error: friendlyDbError(error) };
+    if (!data || data.length === 0) {
+      return { success: false, error: 'O serviço não foi gravado no servidor (sem permissão para o seu perfil).' };
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao salvar serviço.') };

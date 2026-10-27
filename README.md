@@ -142,6 +142,34 @@ O app é servido em uma subpasta (`/Concentra`), então o build do Pages define
 > Para testar localmente o resultado do Pages: `npm run build:pages` e depois sirva a pasta `out/`
 > (ex.: `npx serve out`). Em qualquer outro deploy, use `npm run build`.
 
+## Publicar na Vercel (produção — `consentra-sst.vercel.app`)
+
+> ⚠️ **Se o endereço da Vercel mostrar uma versão antiga** (ex.: login com “Lembrar meu acesso” /
+> “Cadastrar novo usuário”), é porque aquele deploy **não está conectado a este repositório** ou foi
+> publicado manualmente de uma cópia antiga. Correções mergeadas na `main` só chegam à Vercel se o
+> projeto estiver ligado ao GitHub (passo 1).
+
+1. **Conecte o projeto ao GitHub:** Vercel → projeto `consentra-sst` → **Settings → Git** →
+   *Connect Git Repository* → `FeufeuP/Concentra`, *Production Branch*: `main`. Assim, todo merge
+   na `main` republica o site automaticamente.
+2. **Variáveis de ambiente** (Settings → Environment Variables, ambiente *Production*):
+
+   | Variável | Valor |
+   |---|---|
+   | `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto (Supabase → Project Settings → API → Project URL) |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chave `anon`/`publishable` (mesma tela) — **nunca** a `service_role`/`secret` |
+
+   Sem essas variáveis o site sobe em **modo local**: os dados ficam só no navegador de cada
+   pessoa (serviços, logotipo e configurações “não salvam” para a equipe). O sistema mostra um
+   aviso amarelo “Modo local (demonstração)” no topo quando isso acontece.
+3. **Supabase → Authentication → URL Configuration:** *Site URL* `https://consentra-sst.vercel.app`
+   e, em *Redirect URLs*, `https://consentra-sst.vercel.app/**` (senão o link de recuperação de
+   senha volta para `localhost`). Faça o mesmo para cada domínio onde o sistema é aberto.
+4. **Redeploy:** Vercel → Deployments → ⋯ → *Redeploy* (variáveis novas só valem em deploy novo).
+5. **Confira:** acesse o site, entre no sistema e veja no topo o selo **Online** (não “Modo
+   local”); cadastre um serviço de teste, recarregue a página (F5) e confirme que ele continua lá;
+   teste **Sair**, **Imprimir** uma proposta e a troca do **logotipo** (Configurações).
+
 ## Banco de dados (Supabase)
 
 1. Crie um projeto em <https://supabase.com/dashboard>.

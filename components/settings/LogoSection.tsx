@@ -155,7 +155,7 @@ export const LogoSection: React.FC<LogoSectionProps> = ({ remoteMode, ensureCanE
                 </span>
               </div>
               <p className="text-[11px] text-[#49607e] mt-0.5">
-                Exibido com proporção original (1.71:1) de alta definição, sem estiramento ou distorções.
+                Exibido sempre na proporção original da imagem, sem estiramento ou distorções.
               </p>
             </div>
           </div>

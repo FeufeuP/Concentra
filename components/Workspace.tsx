@@ -215,8 +215,10 @@ export function Workspace({ onLogout }: WorkspaceProps) {
         onLogout={onLogout}
       />
 
-      {/* Conteúdo principal (deslocado pela largura da sidebar em telas lg) */}
-      <div className="lg:pl-72 flex flex-col min-h-screen">
+      {/* Conteúdo principal (deslocado pela largura da sidebar em telas lg).
+          O id `main-content` é usado pelo CSS de impressão para ocultar toda a
+          tela quando a Ordem de Serviço está aberta (só a O.S. deve imprimir). */}
+      <div id="main-content" className="lg:pl-72 flex flex-col min-h-screen">
         <Header
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
@@ -230,6 +232,22 @@ export function Workspace({ onLogout }: WorkspaceProps) {
         />
 
         <main className="flex-1 p-4 sm:p-8 pt-20 sm:pt-22">
+          {!store.isRemote && (
+            <div
+              role="alert"
+              className="no-print max-w-7xl mx-auto mb-5 p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs flex items-start gap-2.5"
+            >
+              <span className="material-symbols-outlined text-[18px] shrink-0">warning</span>
+              <span>
+                <strong>Modo local (demonstração):</strong> o servidor (Supabase) não está configurado neste
+                endereço, então orçamentos, clientes, serviços, logotipo e configurações ficam salvos{' '}
+                <strong>apenas neste navegador</strong> — somem em outro aparelho/navegador ou ao limpar os dados
+                do navegador. Para uso real da equipe, publique com{' '}
+                <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> e{' '}
+                <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (README → “Publicar na Vercel”).
+              </span>
+            </div>
+          )}
           {status === 'loading' && (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-9 h-9 border-4 border-[#004328] border-t-transparent rounded-full animate-spin mb-3" />

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { brDateToIso, isoDateToBr, normalizeQuoteId, quoteToPayload, itemsToPayload } from '@/lib/supabase';
+import { brDateToIso, isoDateToBr, normalizeQuoteId, quoteToPayload, itemsToPayload, catalogToPayload } from '@/lib/supabase';
 import { makeItem, makeQuote } from './helpers';
 
 describe('datas app ⇄ banco', () => {
@@ -79,5 +79,38 @@ describe('quoteToPayload', () => {
     expect(rows[0]).toMatchObject({ item_number: 1, quantity: 2, unit_price: 50, total_price: 100 });
     expect(rows[1]).toMatchObject({ item_number: 2, title: 'Item', unit: 'unidade' });
     expect(itemsToPayload(undefined)).toEqual([]);
+  });
+});
+
+describe('catalogToPayload', () => {
+  it('mapeia o serviço para snake_case com padrões seguros', () => {
+    const payload = catalogToPayload({
+      id: 'srv-1',
+      code: '#SRV-13',
+      title: 'Laudo Novo',
+      subtitle: '',
+      description: 'Escopo',
+      unit: '',
+      suggestedPrice: 2500,
+      nrCategory: 'NR-35',
+      category: 'Treinamentos',
+      status: 'Ativo',
+      deliverables: ['ART'],
+      quickSelect: true,
+    });
+    expect(payload).toEqual({
+      id: 'srv-1',
+      code: '#SRV-13',
+      title: 'Laudo Novo',
+      subtitle: null,
+      description: 'Escopo',
+      unit: 'Unidade',
+      suggested_price: 2500,
+      nr_category: 'NR-35',
+      category: 'Treinamentos',
+      status: 'Ativo',
+      deliverables: ['ART'],
+      quick_select: true,
+    });
   });
 });

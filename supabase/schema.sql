@@ -776,5 +776,17 @@ CREATE TRIGGER tr_quotes_log_events
     FOR EACH ROW EXECUTE FUNCTION public.log_quote_event();
 
 -- ==============================================================================
+-- 10. LOGOTIPO PÚBLICO NA TELA DE LOGIN (Fase 6)
+-- Leitura anon SOMENTE da chave `logo_url` (URL pública do bucket `branding`),
+-- para a tela de acesso já abrir com o logotipo oficial em navegadores novos.
+-- Nenhuma outra configuração fica acessível sem login. Ver upgrade_fase6.sql.
+-- ==============================================================================
+GRANT SELECT ON public.app_settings TO anon;
+
+DROP POLICY IF EXISTS "app_settings_select_logo_public" ON public.app_settings;
+CREATE POLICY "app_settings_select_logo_public" ON public.app_settings
+    FOR SELECT TO anon USING (key = 'logo_url');
+
+-- ==============================================================================
 -- FIM
 -- ==============================================================================

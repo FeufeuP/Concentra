@@ -32,7 +32,13 @@ export function BrandLogo({ src, alt, className, style }: BrandLogoProps) {
       decoding="async"
       onError={(e) => {
         const img = e.currentTarget;
-        if (!img.src.endsWith(DEFAULT_LOGO_URL)) img.src = DEFAULT_LOGO_URL;
+        if (img.dataset.fallback) {
+          // Nem o logotipo padrão carregou: esconde o ícone de imagem quebrada
+          img.style.visibility = 'hidden';
+          return;
+        }
+        img.dataset.fallback = '1';
+        img.src = DEFAULT_LOGO_URL;
       }}
     />
   );

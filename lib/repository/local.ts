@@ -118,7 +118,13 @@ export function createLocalRepository(
     async saveService(service) {
       const list = catalog();
       const idx = list.findIndex(s => s.id === service.id);
-      return write(LOCAL_CATALOG_KEY, idx >= 0 ? list.map((s, i) => (i === idx ? service : s)) : [service, ...list]);
+      const now = new Date().toISOString();
+      const stamped: CatalogService = {
+        ...service,
+        createdAt: service.createdAt || (idx >= 0 ? list[idx]!.createdAt : now),
+        updatedAt: service.updatedAt || now,
+      };
+      return write(LOCAL_CATALOG_KEY, idx >= 0 ? list.map((s, i) => (i === idx ? stamped : s)) : [stamped, ...list]);
     },
 
     async deleteService(serviceId) {
