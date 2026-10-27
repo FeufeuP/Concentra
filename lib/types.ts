@@ -85,4 +85,7 @@ export interface CatalogService {
   status?: 'Ativo' | 'Inativo';
   deliverables?: string[];
   quickSelect?: boolean;
+  /** ISO — vêm do banco (created_at/updated_at) ou são carimbados ao salvar no modo local. */
+  createdAt?: string;
+  updatedAt?: string;
 }

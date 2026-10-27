@@ -61,9 +61,14 @@ export default function HomePage() {
   }, []);
 
   const handleLogout = async () => {
-    await logoutUser();
+    // Sai da área logada imediatamente; a limpeza (rede/servidor) termina em seguida.
     setCurrentUser(null);
-    showToast('Sessão encerrada com sucesso.');
+    try {
+      await logoutUser();
+    } finally {
+      setCurrentUser(null);
+      showToast('Sessão encerrada com sucesso.');
+    }
   };
 
   if (!isMounted || !authChecked) {

@@ -414,6 +414,19 @@ export async function initAuth(): Promise<AuthInitResult> {
       setCurrentUserSession(null);
       return { user: null, recovery: false, linkError };
     }
+    // O usuário saiu, mas sobrou sessão no navegador (ex.: página recarregada
+    // no meio do logout): não ressuscita a sessão — encerra de vez.
+    // Logins novos removem esta flag (inclusive em outras abas: é o mesmo armazenamento).
+    if (!recovery && typeof window !== 'undefined' && localStorage.getItem(STORAGE_LOGGED_OUT_KEY) === 'true') {
+      try {
+        await client.auth.signOut({ scope: 'local' });
+      } catch {
+        /* ignora */
+      }
+      purgeSupabaseTokens();
+      setCurrentUserSession(null);
+      return { user: null, recovery: false, linkError };
+    }
     const profile = await fetchProfile(client, session.user.id);
     if (!profile) {
       await client.auth.signOut();
@@ -495,15 +508,57 @@ export async function loginUser(identifier: string, pass: string): Promise<AuthR
   return { success: true, user };
 }
 
-export async function logoutUser(): Promise<void> {
-  setCurrentUserSession(null);
-  if (isRemoteAuth()) {
+/** Remove os tokens do Supabase Auth guardados no navegador (`sb-<ref>-auth-token*`). */
+function purgeSupabaseTokens(): void {
+  if (typeof window === 'undefined') return;
+  for (const store of [window.localStorage, window.sessionStorage]) {
     try {
-      await getSupabaseClient()?.auth.signOut();
+      const keys: string[] = [];
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.startsWith('sb-')) keys.push(k);
+      }
+      keys.forEach((k) => store.removeItem(k));
+    } catch {
+      /* armazenamento indisponível */
+    }
+  }
+}
+
+/**
+ * Encerra a sessão de forma confiável, mesmo com a rede lenta/indisponível.
+ *
+ * A versão anterior aguardava o `signOut()` global (que depende de uma chamada
+ * ao servidor): se a chamada travasse/falhasse — ou se a página fosse recarregada
+ * no meio dela — o token continuava no navegador, o `initAuth()` restaurava a
+ * sessão e o usuário "voltava logado" (o botão Sair parecia não funcionar).
+ * Agora: limpa a sessão local primeiro, tenta revogar no servidor com tempo
+ * limite, encerra a sessão local do Supabase e apaga os tokens manualmente.
+ */
+export async function logoutUser(): Promise<void> {
+  // 1) Interface e cache local saem na hora, sem depender da rede
+  setCurrentUserSession(null);
+  if (!isRemoteAuth()) return;
+
+  const client = getSupabaseClient();
+  if (client) {
+    // 2) Revoga as sessões no servidor — melhor esforço, com tempo limite
+    try {
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000));
+      await Promise.race([client.auth.signOut({ scope: 'global' }), timeout]);
+    } catch {
+      /* segue para a limpeza local abaixo */
+    }
+    // 3) Garante o encerramento local da sessão do Supabase (sem rede)
+    try {
+      await client.auth.signOut({ scope: 'local' });
     } catch {
       /* sessão já encerrada */
     }
   }
+  // 4) Tokens fora do navegador e flag de "saiu" reafirmada por último
+  purgeSupabaseTokens();
+  setCurrentUserSession(null);
 }
 
 // =============================================================================

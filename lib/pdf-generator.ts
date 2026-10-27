@@ -79,11 +79,40 @@ export async function getImageUrlAsBase64(url: string): Promise<string> {
   }
 }
 
+/** Escapa um valor para interpolação segura no HTML da folha A4 (innerHTML). */
+export function esc(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /**
- * Prepara ou clona o elemento A4 garantindo isolamento total de zoom e transformações de tela
+ * Escapa todos os campos de texto (primeiro nível) de um objeto.
+ * A folha A4 é montada com innerHTML: sem isto, um cliente chamado
+ * "A & B <Ltda>" (ou aspas/quebras em descrições) quebrava o layout do
+ * PDF/impressão — e qualquer HTML digitado num cadastro era executado.
  */
-async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement; cleanup: () => void }> {
-  const existingSheet = document.getElementById('a4-sheet');
+export function escapeFields<T extends object>(obj: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) out[k] = typeof v === 'string' ? esc(v) : v;
+  return out as T;
+}
+
+/**
+ * Constrói a folha A4 off-screen usada em PDF/download/impressão.
+ *
+ * SEMPRE constrói a folha autônoma (estilos inline em hex), em vez de clonar a
+ * folha em tela (`#a4-sheet`): o clone carrega as classes do Tailwind v4, cuja
+ * paleta o navegador resolve como `lab(...)`/`color-mix(...)` — funções de cor
+ * que o html2canvas 1.4.1 (do html2pdf.js) NÃO sabe interpretar ("Attempting to
+ * parse an unsupported color function"), fazendo gerar/imprimir o PDF falhar
+ * silenciosamente justamente a partir do visualizador. A folha autônoma também
+ * isola zoom/transformações de tela e produz o mesmo resultado de qualquer aba.
+ */
+async function getOrBuildA4Element(rawQuote: Quote): Promise<{ element: HTMLElement; cleanup: () => void }> {
   const staging = document.createElement('div');
   staging.id = 'pdf-render-staging-' + Date.now();
   staging.style.position = 'fixed';
@@ -94,51 +123,7 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
   staging.style.zIndex = '-99999';
   staging.style.overflow = 'visible';
 
-  if (existingSheet) {
-    const clone = existingSheet.cloneNode(true) as HTMLElement;
-    clone.id = 'a4-sheet-render-clone';
-    clone.style.width = '794px';
-    clone.style.maxWidth = '794px';
-    clone.style.minHeight = '1120px';
-    clone.style.maxHeight = '1122px';
-    clone.style.transform = 'none';
-    clone.style.margin = '0';
-    clone.style.padding = '36px 44px';
-    clone.style.boxSizing = 'border-box';
-    clone.style.boxShadow = 'none';
-    clone.style.borderRadius = '0';
-    clone.style.border = 'none';
-    clone.style.backgroundColor = '#ffffff';
-    clone.style.overflow = 'hidden';
-    clone.style.pageBreakAfter = 'avoid';
-    clone.style.pageBreakInside = 'avoid';
-
-    // Converte imagens internas para Base64 para garantir carregamento instantâneo pelo html2canvas
-    const images = clone.querySelectorAll('img');
-    for (const img of Array.from(images)) {
-      const src = img.getAttribute('src') || '';
-      if (src && !src.startsWith('data:')) {
-        try {
-          const b64 = await getImageUrlAsBase64(src);
-          if (b64) img.setAttribute('src', b64);
-        } catch {
-          // Mantém src original
-        }
-      }
-    }
-
-    staging.appendChild(clone);
-    document.body.appendChild(staging);
-
-    return {
-      element: clone,
-      cleanup: () => {
-        if (staging.parentNode) staging.parentNode.removeChild(staging);
-      }
-    };
-  }
-
-  // Se a folha não estiver visível na página atual, constrói a folha A4 idêntica off-screen
+  // Constrói a folha A4 autônoma off-screen (idêntica em qualquer tela)
   const companyProfile = getStoredCompanyProfile();
   const quoteTexts = getStoredQuoteTexts();
   const storedLogo = getStoredLogoUrl();
@@ -151,10 +136,16 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
     }
   }
 
-  const effectiveHeader: CompanyProfile = { ...companyProfile, ...(quote.headerConfig || {}) };
-  const effectiveTexts: QuoteTextsConfig = { ...quoteTexts, ...(quote.customTexts || {}) };
-  const responsibleName = quote.responsibleTech || getStoredResponsibles()[0] || effectiveHeader.technicalResponsible;
-  const cleanNum = String(quote.numberOnly || quote.id).replace('#', '').trim();
+  // Dados já escapados para o innerHTML abaixo (ver `escapeFields`)
+  const quote: Quote = {
+    ...escapeFields(rawQuote),
+    items: (rawQuote.items || []).map((item) => escapeFields(item)),
+  };
+  const effectiveHeader: CompanyProfile = escapeFields({ ...companyProfile, ...(rawQuote.headerConfig || {}) });
+  const effectiveTexts: QuoteTextsConfig = escapeFields({ ...quoteTexts, ...(rawQuote.customTexts || {}) });
+  const responsibleName = esc(rawQuote.responsibleTech || getStoredResponsibles()[0] || companyProfile.technicalResponsible || '');
+  const cleanNum = String(rawQuote.numberOnly || rawQuote.id).replace('#', '').trim();
+  logoBase64 = esc(logoBase64);
 
   staging.innerHTML = `
     <div id="a4-sheet-standalone" style="width: 794px; max-width: 794px; min-height: 1120px; max-height: 1122px; background-color: #ffffff; color: #0b1c30; padding: 36px 44px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: space-between; page-break-after: avoid; page-break-inside: avoid; break-after: avoid; break-inside: avoid; overflow: hidden;">
@@ -443,58 +434,108 @@ export async function downloadQuotePdf(quote: Quote): Promise<boolean> {
   }
 }
 
+/** Resultado de uma tentativa de impressão da proposta. */
+export type PrintQuoteResult = 'printed' | 'opened' | 'downloaded' | false;
+
 /**
- * Envia o PDF gerado diretamente para a impressora do navegador via iframe oculto
- * Mantém 100% de fidelidade de cores, logotipo e proporções sem distorções de página
+ * Imprime a proposta a partir do PDF gerado (fidelidade total ao documento).
+ *
+ * Ordem de tentativas — a versão anterior usava só um iframe 0×0 + 300 ms, que
+ * falhava em vários navegadores (visualizador de PDF não pronto, Safari/iOS sem
+ * suporte a imprimir PDF em iframe) e o erro era silencioso:
+ * 1. iframe oculto, aguardando o visualizador carregar, com `contentWindow.print()`;
+ * 2. se não for possível, abre o PDF em nova aba (o usuário imprime de lá);
+ * 3. se a aba for bloqueada, baixa o PDF.
+ * Retorna `false` somente se nem o PDF pôde ser gerado.
  */
-export async function printQuotePdf(quote: Quote): Promise<boolean> {
+export async function printQuotePdf(quote: Quote): Promise<PrintQuoteResult> {
   const { element, cleanup } = await getOrBuildA4Element(quote);
 
   try {
     const html2pdf = await loadHtml2Pdf();
-
     const opt = buildQuotePdfOptions();
-
-    const pdfWorker = html2pdf().set(opt).from(element);
-    const blob: Blob = await pdfWorker.output('blob');
+    const blob: Blob = await html2pdf().set(opt).from(element).output('blob');
     const blobUrl = URL.createObjectURL(blob);
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    iframe.src = blobUrl;
+    const result = await tryPrintPdfBlob(blobUrl);
+    if (result === 'printed') return 'printed';
 
-    document.body.appendChild(iframe);
+    const opened = window.open(blobUrl, '_blank');
+    if (opened) {
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      return 'opened';
+    }
 
-    iframe.onload = () => {
-      setTimeout(() => {
-        try {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-        } catch (e) {
-          console.error('Erro ao acionar impressão pelo iframe:', e);
-          window.open(blobUrl, '_blank');
-        }
-        setTimeout(() => {
-          if (iframe.parentNode) {
-            iframe.parentNode.removeChild(iframe);
-          }
-          URL.revokeObjectURL(blobUrl);
-        }, 60000);
-      }, 300);
-    };
-
-    return true;
+    // Nova aba bloqueada pelo navegador: baixa o arquivo
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = quotePdfFileName(quote);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    return 'downloaded';
   } catch (err) {
     console.error('Erro ao imprimir PDF do orçamento com html2pdf.js:', err);
     return false;
   } finally {
     cleanup();
   }
+}
+
+/** Tenta imprimir um PDF (blob) via iframe oculto. Resolve 'printed' ou false. */
+function tryPrintPdfBlob(blobUrl: string): Promise<'printed' | false> {
+  return new Promise((resolve) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    // 0×0 impede alguns navegadores de renderizar o visualizador de PDF
+    iframe.style.width = '1px';
+    iframe.style.height = '1px';
+    iframe.style.border = 'none';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
+
+    let settled = false;
+    const finish = (value: 'printed' | false) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+      // Mantém o iframe/URL vivos até o diálogo de impressão fechar
+      setTimeout(() => {
+        iframe.remove();
+        if (value === 'printed') URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    };
+
+    // Prazo máximo para o visualizador responder
+    const giveUp = setTimeout(() => finish(false), 4000);
+
+    iframe.onload = () => {
+      // O visualizador de PDF precisa de um instante após o onload
+      setTimeout(() => {
+        clearTimeout(giveUp);
+        try {
+          const win = iframe.contentWindow;
+          if (!win) return finish(false);
+          win.focus();
+          win.print();
+          finish('printed');
+        } catch (e) {
+          console.error('Erro ao acionar impressão pelo iframe:', e);
+          finish(false);
+        }
+      }, 600);
+    };
+    iframe.onerror = () => {
+      clearTimeout(giveUp);
+      finish(false);
+    };
+
+    iframe.src = blobUrl;
+    document.body.appendChild(iframe);
+  });
 }
 
 /**

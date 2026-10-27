@@ -14,6 +14,7 @@ import {
   QuoteTextsConfig 
 } from '@/lib/company';
 import { AdminQuoteConfigModal } from './AdminQuoteConfigModal';
+import { useToast } from './ui/ToastProvider';
 
 interface PdfVisualizerViewProps {
   quote: Quote;
@@ -36,6 +37,7 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
   currentUser,
   onSaveQuote,
 }) => {
+  const showToast = useToast();
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
@@ -98,9 +100,20 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
-      await printQuotePdf(quote);
+      const result = await printQuotePdf(quote);
+      if (result === 'opened') {
+        showToast('PDF aberto em uma nova aba — use o botão de imprimir dela.', 'info');
+      } else if (result === 'downloaded') {
+        showToast('O navegador bloqueou a impressão direta: o PDF foi baixado para você imprimir.', 'info');
+      } else if (result === false) {
+        // Não falha em silêncio: avisa e usa a impressão nativa da folha em tela
+        showToast('Não foi possível gerar o PDF para impressão. Abrindo a impressão da página…', 'error');
+        window.print();
+      }
     } catch (err) {
       console.error('Erro ao imprimir PDF:', err);
+      showToast('Não foi possível gerar o PDF para impressão. Abrindo a impressão da página…', 'error');
+      window.print();
     } finally {
       setIsPrinting(false);
     }
@@ -114,11 +127,12 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
         setDownloadSuccess(true);
         setTimeout(() => setDownloadSuccess(false), 4000);
       } else {
-        // Fallback nativo confiável
+        showToast('Não foi possível gerar o PDF. Abrindo a impressão para salvar por ela…', 'error');
         window.print();
       }
     } catch (err) {
       console.error('Erro ao gerar download do PDF:', err);
+      showToast('Não foi possível gerar o PDF. Abrindo a impressão para salvar por ela…', 'error');
       window.print();
     } finally {
       setIsDownloading(false);
@@ -277,8 +291,9 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
       </div>
 
       {/* Sheet Frame Centering Container with Dynamic Zoom */}
-      <div className="flex justify-center w-full overflow-x-auto p-2 sm:p-6 bg-[#f0f4fa]/60 rounded-3xl border border-[#e5eeff]">
+      <div id="sheet-frame" className="flex justify-center w-full overflow-x-auto p-2 sm:p-6 bg-[#f0f4fa]/60 rounded-3xl border border-[#e5eeff]">
         <div
+          className="sheet-zoom"
           style={{
             transform: `scale(${zoomLevel / 100})`,
             transformOrigin: 'top center',

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { TabType } from './Sidebar';
 import { AuthUser } from '@/lib/auth';
 import type { Quote } from '@/lib/types';
@@ -32,6 +32,25 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const connection = useConnectionStatus();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o menu do usuário ao clicar fora ou pressionar Esc (antes ele ficava
+  // aberto sobre o conteúdo até o usuário clicar exatamente no avatar de novo).
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setShowUserMenu(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowUserMenu(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showUserMenu]);
 
   const userName = currentUser?.name || 'Washington Assis';
   const userInitials = currentUser?.initials || 'WA';
@@ -96,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
         />
 
         {/* User profile */}
-        <div className="relative">
+        <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-3 pl-2 py-1 rounded-xl hover:bg-[#eff4ff] transition-colors text-left"

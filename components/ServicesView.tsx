@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useDialog } from './ui/DialogProvider';
 import { useToast } from './ui/ToastProvider';
 import { CatalogService } from '@/lib/types';
+import { sortCatalog, type ServiceSortBy } from '@/lib/catalog-search';
 import { ServiceFormDrawer } from './services/ServiceFormDrawer';
 
 interface ServicesViewProps {
@@ -37,7 +38,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
   const [selectedNrFilter, setSelectedNrFilter] = useState<string>('Todas');
-  const [sortBy, setSortBy] = useState<'recent' | 'price-asc' | 'price-desc' | 'code' | 'name'>('recent');
+  const [sortBy, setSortBy] = useState<ServiceSortBy>('recent');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -63,7 +64,7 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
 
   // Filtering & Sorting
   const filteredServices = useMemo(() => {
-    return services.filter(item => {
+    const filtered = services.filter(item => {
       // Category pill filter
       let matchesCat = true;
       if (selectedCategory !== 'Todos') {
@@ -92,13 +93,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
                             item.nrCategory.toLowerCase().includes(query);
 
       return matchesCat && matchesNr && matchesSearch;
-    }).sort((a, b) => {
-      if (sortBy === 'price-asc') return a.suggestedPrice - b.suggestedPrice;
-      if (sortBy === 'price-desc') return b.suggestedPrice - a.suggestedPrice;
-      if (sortBy === 'code') return (a.code || a.id).localeCompare(b.code || b.id);
-      if (sortBy === 'name') return a.title.localeCompare(b.title);
-      return 0; // recent/default
     });
+    return sortCatalog(filtered, sortBy);
   }, [services, selectedCategory, selectedNrFilter, searchTerm, sortBy]);
 
   // Paginated Items
@@ -126,6 +122,15 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
     if (!ok) return;
     showToast(isNew ? `Novo serviço ${service.code} cadastrado no catálogo!` : `Serviço ${service.code} atualizado com sucesso!`);
     setIsDrawerOpen(false);
+    // Garante que o serviço salvo fique visível: sem isto, filtros/busca ativos
+    // ou estar na página 2 escondiam o item recém-cadastrado ("não salvou").
+    setCurrentPage(1);
+    if (isNew) {
+      setSearchTerm('');
+      setSelectedCategory('Todos');
+      setSelectedNrFilter('Todas');
+      setSortBy('recent');
+    }
   };
 
   // Duplicate Service
@@ -142,6 +147,8 @@ export const ServicesView: React.FC<ServicesViewProps> = ({
     const ok = await onSaveService(duplicated, true);
     if (!ok) return;
     showToast(`Serviço duplicado como ${nextCode}!`);
+    setCurrentPage(1);
+    setSortBy('recent');
   };
 
   // Delete Service

@@ -130,7 +130,7 @@
     overflow: hidden !important;
   }
 
-  .pl-72 {
+  .pl-72, .lg\:pl-72 {
     padding-left: 0 !important;
   }
 
@@ -139,22 +139,49 @@
     margin: 0 !important;
   }
 
-  #a4-sheet, #a4-sheet-render-clone, #a4-sheet-standalone, .print-single-page {
+  /* Visualizador da proposta (impressão nativa da página): desfaz o zoom de
+     tela e o contêiner rolável, que cortavam/recortavam a folha no papel */
+  #sheet-frame {
+    overflow: visible !important;
+    background: white !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    display: block !important;
+  }
+
+  .sheet-zoom {
+    transform: none !important;
+  }
+
+  #a4-sheet, #a4-sheet-standalone, .print-single-page {
     box-shadow: none !important;
     border: none !important;
     margin: 0 auto !important;
     transform: none !important;
     width: 100% !important;
     max-width: 190mm !important;
-    height: auto !important;
+    /* Altura cheia da área útil: mantém o rodapé/assinaturas no fim da página
+       (o layout da folha usa justify-between, que depende da altura) */
+    height: 277mm !important;
     max-height: 277mm !important;
-    padding: 0 !important;
+    padding: 4mm 2mm !important;
     box-sizing: border-box !important;
     page-break-after: avoid !important;
     page-break-inside: avoid !important;
     break-after: avoid !important;
     break-inside: avoid !important;
     overflow: hidden !important;
+  }
+
+  /* Tabelas longas (relatório impresso): repete o cabeçalho a cada página */
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 
