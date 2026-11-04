@@ -352,7 +352,7 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const addClient = useCallback(
     async (client: ClientData): Promise<boolean> => {
       if (!ensureCanWrite()) return false;
-      const res = await repo.saveClient(client);
+      const res = await repo.saveClient(client, true);
       if (!res.success) {
         handleFailure(`Cliente "${client.name}" não foi cadastrado`, res.error);
         return false;
@@ -367,7 +367,7 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const editClient = useCallback(
     async (client: ClientData): Promise<boolean> => {
       if (!ensureCanWrite()) return false;
-      const res = await repo.saveClient(client);
+      const res = await repo.saveClient(client, false);
       if (!res.success) {
         handleFailure(`Dados do cliente "${client.name}" não foram salvos`, res.error);
         return false;

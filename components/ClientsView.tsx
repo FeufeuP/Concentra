@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ClientData } from '@/lib/types';
 import { maskPhoneBR } from '@/lib/masks';
+import { useToast } from './ui/ToastProvider';
 
 interface ClientsViewProps {
   clients: ClientData[];
   onNewQuoteForClient: (client: ClientData) => void;
-  onEditClient?: (client: ClientData) => void;
-  onDeleteClient?: (clientId: string) => void;
-  onAddClient?: (client: ClientData) => void;
+  onEditClient?: (client: ClientData) => Promise<boolean>;
+  onDeleteClient?: (clientId: string) => Promise<boolean>;
+  onAddClient?: (client: ClientData) => Promise<boolean>;
 }
 
 export const ClientsView: React.FC<ClientsViewProps> = ({
@@ -19,7 +20,11 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   onDeleteClient,
   onAddClient,
 }) => {
+  const showToast = useToast();
   const [search, setSearch] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
+  const draftId = useRef<string | null>(null);
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData | null>(null);
   const [clientToDelete, setClientToDelete] = useState<ClientData | null>(null);
@@ -41,6 +46,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
   );
 
   const handleOpenAdd = () => {
+    draftId.current = null;
     setEditingClient(null);
     setFormData({
       name: '',
@@ -60,59 +66,68 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
     setIsAddingClient(true);
   };
 
-  const handleSaveForm = (e: React.FormEvent) => {
+  const handleSaveForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.cnpj) return;
+    if (!formData.name || !formData.cnpj || savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      if (editingClient) {
+        // Alteração de cliente existente
+        const updatedClient: ClientData = {
+          ...editingClient,
+          name: formData.name || '',
+          cnpj: formData.cnpj || '',
+          riskGrade: formData.riskGrade || 'Grau de Risco 2',
+          contactName: formData.contactName || '',
+          email: formData.email || '',
+          phone: formData.phone || '',
+          address: formData.address || ''
+        };
 
-    if (editingClient) {
-      // Alteração de cliente existente
-      const updatedClient: ClientData = {
-        ...editingClient,
-        name: formData.name || '',
-        cnpj: formData.cnpj || '',
-        riskGrade: formData.riskGrade || 'Grau de Risco 2',
-        contactName: formData.contactName || '',
-        email: formData.email || '',
-        phone: formData.phone || '',
-        address: formData.address || ''
-      };
+        if (!onEditClient || !await onEditClient(updatedClient)) return;
+      } else {
+        // Inclusão de novo cliente
+        const clientToAdd: ClientData = {
+          id: draftId.current ||= `CL-${crypto.randomUUID()}`,
+          name: formData.name || '',
+          cnpj: formData.cnpj || '',
+          riskGrade: formData.riskGrade || 'Grau de Risco 2',
+          contactName: formData.contactName || '',
+          email: formData.email || '',
+          phone: formData.phone || '',
+          address: formData.address || ''
+        };
+        if (!onAddClient || !await onAddClient(clientToAdd)) return;
+      }
 
-      if (onEditClient) {
-        onEditClient(updatedClient);
-      }
-    } else {
-      // Inclusão de novo cliente
-      const clientToAdd: ClientData = {
-        id: `CL-${Math.floor(1000 + Math.random() * 9000)}`,
-        name: formData.name || '',
-        cnpj: formData.cnpj || '',
-        riskGrade: formData.riskGrade || 'Grau de Risco 2',
-        contactName: formData.contactName || '',
-        email: formData.email || '',
-        phone: formData.phone || '',
-        address: formData.address || ''
-      };
-      if (onAddClient) {
-        onAddClient(clientToAdd);
-      }
+      setIsAddingClient(false);
+      setEditingClient(null);
+      setFormData({ name: '', cnpj: '', riskGrade: 'Grau de Risco 2', contactName: '', email: '', phone: '', address: '' });
+    } catch (err) {
+      showToast(`Cliente não salvo: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
-
-    setIsAddingClient(false);
-    setEditingClient(null);
-    setFormData({ name: '', cnpj: '', riskGrade: 'Grau de Risco 2', contactName: '', email: '', phone: '', address: '' });
   };
 
   const confirmDelete = (client: ClientData) => {
     setClientToDelete(client);
   };
 
-  const handleConfirmDeleteAction = () => {
-    if (!clientToDelete) return;
-    const id = clientToDelete.id;
-    if (onDeleteClient) {
-      onDeleteClient(id);
+  const handleConfirmDeleteAction = async () => {
+    if (!clientToDelete || savingRef.current) return;
+    savingRef.current = true;
+    setIsSaving(true);
+    try {
+      if (onDeleteClient && await onDeleteClient(clientToDelete.id)) setClientToDelete(null);
+    } catch (err) {
+      showToast(`Cliente não excluído: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
-    setClientToDelete(null);
   };
 
   return (
@@ -170,7 +185,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
                   </span>
                 )}
               </div>
-              <button
+              <button disabled={isSaving}
                 type="button"
                 onClick={() => {
                   setIsAddingClient(false);
@@ -185,7 +200,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="sm:col-span-2">
                 <label className="block font-semibold text-[#404942] mb-1">Razão Social *</label>
-                <input
+                <input disabled={isSaving}
                   required
                   type="text"
                   value={formData.name}
@@ -197,7 +212,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-[#404942] mb-1">CNPJ *</label>
-                <input
+                <input disabled={isSaving}
                   required
                   type="text"
                   value={formData.cnpj}
@@ -209,7 +224,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-[#404942] mb-1">Grau de Risco</label>
-                <select
+                <select disabled={isSaving}
                   value={formData.riskGrade}
                   onChange={(e) => setFormData({ ...formData, riskGrade: e.target.value })}
                   className="w-full h-9 px-2 rounded-lg bg-[#eff4ff] border border-[#c4dcff]/40 focus:bg-white focus:outline-none"
@@ -223,7 +238,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-[#404942] mb-1">Contato / Gestor</label>
-                <input
+                <input disabled={isSaving}
                   type="text"
                   value={formData.contactName}
                   onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
@@ -234,7 +249,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-[#404942] mb-1">Telefone</label>
-                <input
+                <input disabled={isSaving}
                   type="text"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: maskPhoneBR(e.target.value) })}
@@ -245,7 +260,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div className="sm:col-span-2">
                 <label className="block font-semibold text-[#404942] mb-1">E-mail Comercial</label>
-                <input
+                <input disabled={isSaving}
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -256,7 +271,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
 
               <div className="sm:col-span-2">
                 <label className="block font-semibold text-[#404942] mb-1">Endereço da Planta</label>
-                <input
+                <input disabled={isSaving}
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -267,7 +282,7 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-[#eff4ff]">
-              <button
+              <button disabled={isSaving}
                 type="button"
                 onClick={() => {
                   setIsAddingClient(false);
@@ -279,9 +294,10 @@ export const ClientsView: React.FC<ClientsViewProps> = ({
               </button>
               <button
                 type="submit"
+                disabled={isSaving}
                 className="px-4 py-2 rounded-xl bg-[#004328] text-white text-xs font-semibold hover:bg-[#005c3e]"
               >
-                {editingClient ? 'Salvar Alterações' : 'Salvar Cliente'}
+                {isSaving ? 'Salvando...' : editingClient ? 'Salvar Alterações' : 'Salvar Cliente'}
               </button>
             </div>
           </form>

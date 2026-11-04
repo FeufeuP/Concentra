@@ -1,55 +1,39 @@
 'use client';
 
-/**
- * Envio das configurações gerais (app_settings) para o Supabase.
- *
- * As configurações continuam com um cache síncrono no localStorage (os
- * componentes leem de lá), mas no modo Supabase o banco é a fonte da verdade:
- * - ao entrar, `pullRemoteSettings()` (lib/settings-sync.ts) baixa os valores;
- * - ao salvar, as funções de lib/company.ts, lib/responsibles.ts e lib/logo.ts
- *   chamam `pushSetting()`, que grava no banco em segundo plano.
- * Se a gravação falhar (ex.: perfil sem permissão), é disparado o evento
- * SETTINGS_SYNC_ERROR_EVENT; a página mostra o erro e recarrega os valores do
- * servidor, desfazendo a alteração local.
- */
+/** Gravações de configurações confirmadas pelo servidor, serializadas por chave. */
 import { isSupabaseConfigured, saveAppSetting } from './supabase';
 
 export const SETTINGS_SYNC_ERROR_EVENT = 'consentra_settings_sync_error';
-
 export const SETTING_KEYS = {
   companyProfile: 'company_profile',
   quoteTexts: 'quote_texts',
   responsibles: 'responsible_persons',
   logo: 'logo_url',
 } as const;
-
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
+export interface SettingsSyncErrorDetail { key: SettingKey; error: string }
 
-export interface SettingsSyncErrorDetail {
-  key: SettingKey;
-  error: string;
-}
-
-// Uma fila por chave: garante que a última alteração seja a última gravada
 const queues: Partial<Record<SettingKey, Promise<void>>> = {};
 
-/** Grava (ou remove, com `null`) uma configuração no Supabase. Sem efeito no modo local. */
-export function pushSetting(key: SettingKey, value: unknown): void {
-  if (typeof window === 'undefined' || !isSupabaseConfigured()) return;
+/** Só resolve depois do commit. Uma falha não impede tentativas posteriores. */
+export function pushSetting(key: SettingKey, value: unknown): Promise<void> {
+  if (typeof window === 'undefined' || !isSupabaseConfigured()) return Promise.resolve();
   const previous = queues[key] || Promise.resolve();
-  queues[key] = previous.then(async () => {
+  const pending = previous.catch(() => {}).then(async () => {
     const res = await saveAppSetting(key, value);
-    if (!res.success) {
-      window.dispatchEvent(
-        new CustomEvent<SettingsSyncErrorDetail>(SETTINGS_SYNC_ERROR_EVENT, {
-          detail: { key, error: res.error || 'Erro ao salvar configuração.' },
-        })
-      );
-    }
+    if (!res.success) throw new Error(res.error || 'Erro ao salvar configuração.');
   });
+  queues[key] = pending;
+  // O observador global é complementar: quem iniciou o save também recebe a rejeição.
+  void pending.catch((err: unknown) => {
+    window.dispatchEvent(new CustomEvent<SettingsSyncErrorDetail>(SETTINGS_SYNC_ERROR_EVENT, {
+      detail: { key, error: err instanceof Error ? err.message : 'Erro ao salvar configuração.' },
+    }));
+  });
+  return pending;
 }
 
-/** Aguarda as gravações pendentes (útil antes de recarregar do servidor). */
+/** Uma falha passada não deve bloquear a releitura dos valores reais do servidor. */
 export async function flushPendingSettings(): Promise<void> {
-  await Promise.all(Object.values(queues));
+  await Promise.allSettled(Object.values(queues));
 }

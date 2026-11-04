@@ -50,7 +50,17 @@ export const ResponsiblesSection: React.FC<ResponsiblesSectionProps> = ({
     setTimeout(() => setPersonSuccessMsg(null), 3000);
   };
 
-  const handleAddPerson = (e?: React.SyntheticEvent) => {
+  const saveList = async (updated: string[], message: string) => {
+    const ok = await triggerSectionSave('sec-4', async () => {
+      await saveStoredResponsibles(updated);
+      setResponsibles(updated);
+      onUpdateResponsiblePersons?.(updated);
+    }, message);
+    if (ok) showPersonFeedback(message);
+    return ok;
+  };
+
+  const handleAddPerson = async (e?: React.SyntheticEvent) => {
     e?.preventDefault();
     if (!ensureCanEdit()) return;
     const trimmed = newPersonName.trim();
@@ -62,11 +72,9 @@ export const ResponsiblesSection: React.FC<ResponsiblesSectionProps> = ({
     }
 
     const updated = [...responsibles, trimmed];
-    setResponsibles(updated);
-    saveStoredResponsibles(updated);
-    if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(updated);
-    setNewPersonName('');
-    showPersonFeedback(`"${trimmed}" cadastrado(a) com sucesso! Já disponível no menu em cascata de orçamentos.`);
+    if (await saveList(updated, `"${trimmed}" cadastrado(a) com sucesso! Já disponível no menu em cascata de orçamentos.`)) {
+      setNewPersonName('');
+    }
   };
 
   const handleRemovePerson = async (nameToRemove: string) => {
@@ -83,10 +91,7 @@ export const ResponsiblesSection: React.FC<ResponsiblesSectionProps> = ({
     });
     if (ok) {
       const updated = responsibles.filter(p => p !== nameToRemove);
-      setResponsibles(updated);
-      saveStoredResponsibles(updated);
-      if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(updated);
-      showPersonFeedback(`"${nameToRemove}" removido(a) com sucesso.`);
+      await saveList(updated, `"${nameToRemove}" removido(a) com sucesso.`);
     }
   };
 
@@ -95,18 +100,16 @@ export const ResponsiblesSection: React.FC<ResponsiblesSectionProps> = ({
     setEditingName(currentName);
   };
 
-  const handleSaveEdit = (index: number) => {
+  const handleSaveEdit = async (index: number) => {
     if (!ensureCanEdit()) return;
     const trimmed = editingName.trim();
     if (!trimmed) return;
     const updated = [...responsibles];
     updated[index] = trimmed;
-    setResponsibles(updated);
-    saveStoredResponsibles(updated);
-    if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(updated);
-    setEditingIndex(null);
-    setEditingName('');
-    showPersonFeedback(`Nome atualizado para "${trimmed}" com sucesso!`);
+    if (await saveList(updated, `Nome atualizado para "${trimmed}" com sucesso!`)) {
+      setEditingIndex(null);
+      setEditingName('');
+    }
   };
 
   const handleResetDefault = async () => {
@@ -117,20 +120,14 @@ export const ResponsiblesSection: React.FC<ResponsiblesSectionProps> = ({
       confirmLabel: 'Restaurar',
     });
     if (ok) {
-      setResponsibles(DEFAULT_RESPONSIBLES);
-      saveStoredResponsibles(DEFAULT_RESPONSIBLES);
-      if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(DEFAULT_RESPONSIBLES);
-      showPersonFeedback('Lista de responsáveis restaurada com sucesso!');
+      await saveList(DEFAULT_RESPONSIBLES, 'Lista de responsáveis restaurada com sucesso!');
     }
   };
 
   // 4. Responsável pelo Orçamento
   const handleSaveSection4 = () => {
     if (!ensureCanEdit()) return;
-    triggerSectionSave('sec-4', () => {
-      saveStoredResponsibles(responsibles);
-      if (onUpdateResponsiblePersons) onUpdateResponsiblePersons(responsibles);
-    }, '4. Lista de Responsáveis pelo Orçamento salva com sucesso!');
+    void saveList(responsibles, '4. Lista de Responsáveis pelo Orçamento salva com sucesso!');
   };
 
   return (

@@ -1,0 +1,39 @@
+name: Homologação de persistência
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-smoke:
+    # Opt-in explícito; não executa testes de escrita a cada push/PR.
+    if: >-
+      github.repository == 'FeufeuP/Concentra' &&
+      github.ref == 'refs/heads/arena/86d03fa8-concentra' &&
+      (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[persistence-e2e]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Instalar Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Aguardar a versão exata em produção
+        run: node tests/e2e/fixture.mjs wait
+      - name: Provisionar identidades temporárias por OIDC
+        run: node tests/e2e/fixture.mjs provision
+      - name: Validar login, gravação, logout e nova sessão
+        run: npx playwright test
+      - name: Remover somente fixtures deste run
+        if: always()
+        run: node tests/e2e/fixture.mjs cleanup

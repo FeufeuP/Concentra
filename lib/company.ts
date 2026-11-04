@@ -1,5 +1,6 @@
 import { COMPANY_PROFILE } from './mock-data';
 import { pushSetting, SETTING_KEYS } from './remote-sync';
+import { isSupabaseConfigured } from './supabase';
 
 export interface CompanyProfile {
   name: string;
@@ -82,28 +83,31 @@ export function getStoredCompanyProfile(): CompanyProfile {
   return COMPANY_PROFILE;
 }
 
-export function saveStoredCompanyProfile(profile: Partial<CompanyProfile>): CompanyProfile {
+export async function saveStoredCompanyProfile(profile: Partial<CompanyProfile>): Promise<CompanyProfile> {
   const current = getStoredCompanyProfile();
   const updated = { ...current, ...profile };
   if (typeof window !== 'undefined') {
+    await pushSetting(SETTING_KEYS.companyProfile, updated);
     try {
       localStorage.setItem(STORAGE_PROFILE_KEY, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent('consentra_company_profile_updated', { detail: updated }));
     } catch (e) {
-      console.error('Erro ao salvar perfil da empresa:', e);
+      if (!isSupabaseConfigured()) throw e;
+      console.error('Erro ao atualizar cache do perfil da empresa:', e);
     }
-    pushSetting(SETTING_KEYS.companyProfile, updated);
   }
   return updated;
 }
 
-export function resetStoredCompanyProfile(): CompanyProfile {
+export async function resetStoredCompanyProfile(): Promise<CompanyProfile> {
   if (typeof window !== 'undefined') {
+    await pushSetting(SETTING_KEYS.companyProfile, null);
     try {
       localStorage.removeItem(STORAGE_PROFILE_KEY);
       window.dispatchEvent(new CustomEvent('consentra_company_profile_updated', { detail: COMPANY_PROFILE }));
-    } catch {}
-    pushSetting(SETTING_KEYS.companyProfile, null);
+    } catch (err) {
+      if (!isSupabaseConfigured()) throw err;
+    }
   }
   return COMPANY_PROFILE;
 }
@@ -122,28 +126,31 @@ export function getStoredQuoteTexts(): QuoteTextsConfig {
   return DEFAULT_QUOTE_TEXTS;
 }
 
-export function saveStoredQuoteTexts(texts: Partial<QuoteTextsConfig>): QuoteTextsConfig {
+export async function saveStoredQuoteTexts(texts: Partial<QuoteTextsConfig>): Promise<QuoteTextsConfig> {
   const current = getStoredQuoteTexts();
   const updated = { ...current, ...texts };
   if (typeof window !== 'undefined') {
+    await pushSetting(SETTING_KEYS.quoteTexts, updated);
     try {
       localStorage.setItem(STORAGE_QUOTE_TEXTS_KEY, JSON.stringify(updated));
       window.dispatchEvent(new CustomEvent('consentra_quote_texts_updated', { detail: updated }));
     } catch (e) {
-      console.error('Erro ao salvar textos do orçamento:', e);
+      if (!isSupabaseConfigured()) throw e;
+      console.error('Erro ao atualizar cache dos textos:', e);
     }
-    pushSetting(SETTING_KEYS.quoteTexts, updated);
   }
   return updated;
 }
 
-export function resetStoredQuoteTexts(): QuoteTextsConfig {
+export async function resetStoredQuoteTexts(): Promise<QuoteTextsConfig> {
   if (typeof window !== 'undefined') {
+    await pushSetting(SETTING_KEYS.quoteTexts, null);
     try {
       localStorage.removeItem(STORAGE_QUOTE_TEXTS_KEY);
       window.dispatchEvent(new CustomEvent('consentra_quote_texts_updated', { detail: DEFAULT_QUOTE_TEXTS }));
-    } catch {}
-    pushSetting(SETTING_KEYS.quoteTexts, null);
+    } catch (err) {
+      if (!isSupabaseConfigured()) throw err;
+    }
   }
   return DEFAULT_QUOTE_TEXTS;
 }

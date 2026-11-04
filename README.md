@@ -276,7 +276,7 @@ valem os padrões do código (`lib/mock-data.ts`, `lib/company.ts`).
 
 **Dados antigos do navegador:** se o sistema foi usado no modo local antes de conectar o Supabase,
 **Configurações** mostra o cartão *"Dados salvos somente neste navegador"* para importar orçamentos,
-clientes e configurações. Números já usados no servidor são renumerados, e é seguro repetir a importação.
+clientes e configurações. Documentos novos recebem números reservados no servidor, e recibos persistentes tornam a repetição segura.
 
 **Recuperação de senha:** o usuário recebe um link por e-mail e define a nova senha no próprio
 sistema. O SMTP padrão do Supabase só envia para membros da equipe do projeto e tem limite baixo
@@ -331,3 +331,42 @@ funcionalidades) estão em [`MELHORIAS.md`](./MELHORIAS.md).
 ## Licença
 
 [MIT](./LICENSE)
+
+### Segurança de persistência e importação
+
+- Cadastros novos de clientes usam UUID e **INSERT**. Edições usam **UPDATE** e exigem
+  confirmação de uma linha afetada; uma colisão nunca substitui outro cadastro.
+- Configurações só atualizam o cache e mostram sucesso depois da confirmação do
+  servidor. Uma falha não bloqueia novas tentativas. Logos anteriores são preservados.
+- Listagens de orçamentos, itens, clientes, catálogo e configurações percorrem todas
+  as páginas, com ordenação estável. Erros não são apresentados como listas completas.
+- Em um banco existente da Fase 5, aplique **`supabase/upgrade_import_safety.sql` antes
+  de publicar esta versão**. A migração é aditiva: cria recibos de importação e a RPC
+  `import_quote`, sem alterar orçamentos/clientes/usuários existentes. O schema completo
+  já contém essa atualização para instalações novas.
+- A importação confirma orçamento, itens, histórico e recibo numa única transação.
+  Repetir a operação, inclusive após perda de resposta ou em outra sessão, não duplica
+  o documento nem desfaz edições posteriores. Documentos novos recebem numeração do
+  servidor. Configurações não autorizadas continuam pendentes para um administrador;
+  originais no navegador são preservados.
+
+#### Homologação
+
+`npm test` inclui regressões de interface e integração com PostgreSQL isolado
+(PGlite). Nesses testes o transporte HTTP e a identidade são simulados; eles **não**
+comprovam autenticação de produção por si sós.
+
+O teste Playwright em `tests/e2e/persistence.spec.ts` valida o site real: login,
+cadastro, orçamento com itens, logout, novo contexto de navegador, releitura,
+edição, histórico, importação concorrente e permissões. Catálogo/configurações usam
+somente chaves exclusivas de teste; configurações reais da empresa não são alteradas.
+
+A execução de produção é **opt-in** (workflow manual ou commit com
+`[persistence-e2e]` na branch autorizada). Requer provisionar temporariamente a
+função `persistence-test-fixture` com `verify_jwt: false` **e a validação OIDC interna
+intacta**: assinatura, emissor, audiência, IDs do repositório, branch, workflow e
+prazo. Nunca aceita visitantes nem senhas de usuários reais; usa a service role
+somente dentro do servidor para criar/remover suas próprias fixtures. O workflow
+sempre tenta a limpeza, não publica credenciais/trace/screenshots e não usa secrets
+administrativos no navegador. **Remova a função remota após homologar**; a janela
+fixa expira e precisa ser revista explicitamente para uma futura execução.

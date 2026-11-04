@@ -36,7 +36,7 @@ export interface DataRepository {
   /** Apaga todos os orçamentos. Retorna quantos foram removidos. */
   clearAllQuotes(confirmation: string): Promise<RepoResult<number>>;
 
-  saveClient(client: ClientData): Promise<RepoResult>;
+  saveClient(client: ClientData, isNew: boolean): Promise<RepoResult>;
   deleteClient(clientId: string): Promise<RepoResult>;
 
   saveService(service: CatalogService): Promise<RepoResult>;

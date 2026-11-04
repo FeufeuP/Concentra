@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '../ui/ToastProvider';
 
 /** Estado de "salvar seção" com barra de progresso (Configurações). */
@@ -10,21 +10,32 @@ export function useSectionSave() {
   const [savingProgress, setSavingProgress] = useState<number>(0);
   const [savedSection, setSavedSection] = useState<string | null>(null);
 
-  const triggerSectionSave = useCallback((sectionId: string, action: () => void, successMsg: string) => {
+  const busy = useRef(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
+  const triggerSectionSave = useCallback(async (sectionId: string, action: () => void | Promise<unknown>, successMsg: string) => {
+    if (busy.current) return false;
+    busy.current = true;
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    setSavedSection(null);
     setSavingSection(sectionId);
     setSavingProgress(25);
-
-    setTimeout(() => setSavingProgress(55), 110);
-    setTimeout(() => setSavingProgress(85), 240);
-    setTimeout(() => {
+    try {
+      await action();
       setSavingProgress(100);
-      action();
-      setSavingSection(null);
       setSavedSection(sectionId);
       showToast(successMsg);
-      setTimeout(() => setSavedSection(null), 3000);
-    }, 400);
+      savedTimer.current = setTimeout(() => setSavedSection(null), 3000);
+      return true;
+    } catch (err) {
+      setSavingProgress(0);
+      showToast(`Não foi possível salvar: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
+      return false;
+    } finally {
+      busy.current = false;
+      setSavingSection(null);
+    }
   }, [showToast]);
 
   return { savingSection, savingProgress, savedSection, triggerSectionSave };
