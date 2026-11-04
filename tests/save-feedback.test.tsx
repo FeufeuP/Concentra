@@ -4,8 +4,12 @@ import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useSectionSave } from '@/components/settings/SectionSave';
 import { ClientsView } from '@/components/ClientsView';
+import { AppDataProvider } from '@/lib/store/AppDataContext';
+import { createLocalRepository } from '@/lib/repository/local';
+import { MemoryStorage } from './helpers';
 
-const { toast } = vi.hoisted(() => ({ toast: vi.fn() }));
+const { toast, reloadSettings } = vi.hoisted(() => ({ toast: vi.fn(), reloadSettings: vi.fn() }));
+vi.mock('@/lib/settings-sync', () => ({ pullRemoteSettings: reloadSettings }));
 vi.mock('@/components/ui/ToastProvider', () => ({ useToast: () => toast }));
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -73,4 +77,14 @@ describe('cadastro de cliente', () => {
     expect(onAdd).toHaveBeenCalledTimes(2);
     expect(onAdd.mock.calls[1][0].id).toBe(onAdd.mock.calls[0][0].id);
   });
+});
+
+
+it('falha de configuração não recarrega o cache por cima do formulário ainda em edição', async () => {
+  const repository = { ...createLocalRepository(new MemoryStorage()), kind: 'supabase' as const };
+  const user = { id: 'synthetic-admin', name: 'Synthetic', email: 'test@test.invalid', role: 'Administrador' as const, initials: 'TE' };
+  await act(async () => { render(<AppDataProvider user={user} repository={repository}><div>Formulário em edição</div></AppDataProvider>); });
+  act(() => { window.dispatchEvent(new CustomEvent('consentra_settings_sync_error', { detail: { key: 'company_profile', error: 'offline' } })); });
+  expect(reloadSettings).not.toHaveBeenCalled();
+  expect(toast).toHaveBeenCalledWith(expect.stringContaining('offline'), 'error');
 });

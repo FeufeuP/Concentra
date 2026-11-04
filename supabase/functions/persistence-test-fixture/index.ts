@@ -75,6 +75,12 @@ Deno.serve(async (request: Request) => {
         user_metadata: { name: `${name} ${i === 0 ? 'Admin' : 'Auditor'}`, initials: 'E2' },
       });
       check(result.error);
+      // O Auth grava app_metadata após o INSERT; mesma precaução de admin-users.
+      // Atualiza SOMENTE o perfil da identidade sintética que acabamos de criar.
+      const role = i === 0 ? 'Administrador' : 'Auditor SST';
+      const profile = await admin.from('profiles').update({ role }).eq('id', result.data.user!.id).select('id,role').single();
+      check(profile.error);
+      if (profile.data?.role !== role) throw new Error('Fixture role not confirmed');
       users.push({ id: result.data.user!.id, email: emails[i] });
     }
     return Response.json({ url, anonKey: Deno.env.get('SUPABASE_ANON_KEY'), users, name, prefix });

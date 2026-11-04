@@ -17,6 +17,7 @@ test('produção: cliente + orçamento + itens sobrevivem a logout e novo navega
   const admin = sdk();
   const signedIn = await admin.auth.signInWithPassword({ email: fixture.users[0].email, password: fixture.password });
   expect(signedIn.error).toBeNull();
+  expect((await admin.rpc('is_admin')).data).toBe(true);
   await login(page);
   await page.locator('aside nav').getByRole('button', { name: /Clientes/ }).click();
   await page.getByRole('button', { name: /Cadastrar Novo Cliente/ }).click();
@@ -91,6 +92,7 @@ test('produção: cliente + orçamento + itens sobrevivem a logout e novo navega
     expect((await admin.from('app_settings').insert({ key: `${fixture.prefix}setting`, value: { synthetic: true } })).error).toBeNull();
     const auditor = sdk();
     expect((await auditor.auth.signInWithPassword({ email: fixture.users[1].email, password: fixture.password })).error).toBeNull();
+    expect((await auditor.rpc('can_write')).data).toBe(false);
     expect((await auditor.from('quotes').select('id').eq('created_by', fixture.users[0].id)).data).toHaveLength(2);
     expect((await auditor.rpc('save_quote', { p_quote: header, p_items: itemPayload })).error).not.toBeNull();
     expect((await auditor.rpc('import_quote', { p_quote: source, p_items: itemPayload })).error).not.toBeNull();

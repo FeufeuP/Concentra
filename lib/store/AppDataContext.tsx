@@ -24,7 +24,6 @@ import { DEFAULT_EMPTY_QUOTE } from '../mock-data';
 import { AuthUser, canWrite as userCanWrite, isAdminUser } from '../auth';
 import { createRepository, DataRepository, nextProvisionalNumber, QUOTE_NUMBER_BASE } from '../repository';
 import { getStoredResponsibles, PRIMARY_RESPONSIBLE } from '../responsibles';
-import { pullRemoteSettings } from '../settings-sync';
 import { SETTINGS_SYNC_ERROR_EVENT, SettingsSyncErrorDetail } from '../remote-sync';
 import { getPendingLocalData } from '../local-import';
 import { getTodayFormatted, calculateValidityDate } from '../masks';
@@ -151,7 +150,9 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
     const onSyncError = (e: Event) => {
       const detail = (e as CustomEvent<SettingsSyncErrorDetail>).detail;
       showToast(`Configuração não salva no servidor: ${detail?.error || 'erro desconhecido'}`, 'error');
-      void pullRemoteSettings();
+      // O cache só muda após confirmação. Recarregar aqui apagaria o rascunho
+      // ainda aberto no formulário, justamente quando a gravação falhou.
+      requestConnectionRecheck();
     };
     const onResponsibles = (e: Event) => {
       const detail = (e as CustomEvent<string[]>).detail;
