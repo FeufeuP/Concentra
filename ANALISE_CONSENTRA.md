@@ -48,7 +48,7 @@
 - Comparação com concorrentes de Araucária encontrados na busca.
 
 **Limitações**
-- **Vídeo:** não foi assistido. A análise se baseia só na descrição e na transcrição automática do YouTube, que tem erros de reconhecimento (por exemplo, "concentra", "SSD" e "Assis").
+- **Vídeo:** foram lidos a transcrição integral (automática, com erros corrigidos na versão revisada), a descrição completa e os metadados. **Não foram analisadas imagens nem áudio**, então aparência, gráficos e textos na tela não estão incluídos (ver seção 6.2).
 - **Google Avaliações:** não foi acessado.
 - **Facebook e Instagram:** bloqueados para consulta (erro 403). Não foram analisados.
 - **Reclame Aqui:** o endereço testado retornou 404 e a busca não encontrou perfil da empresa.
@@ -152,10 +152,100 @@ A página `/servicos` agrupa o catálogo em cinco blocos.
 
 ## 6. Vídeo de apresentação
 
-- **Título e metadados:** vídeo não listado no YouTube, duração de 1:26, 106 visualizações, publicado em 18/01/2023.
-- **Conteúdo (pela transcrição automática):** o sócio "Assis" se apresenta e diz que a empresa atua "desde 2008". Cita setores atendidos: petroquímica, refinaria, metalúrgica, celulose, automotiva e obras pesadas.
-- **Limitação:** o vídeo não foi assistido. A transcrição tem erros de reconhecimento de voz, e não é possível avaliar apresentação, imagens ou tom.
-- **Relação com o restante do site:** o vídeo repete a data de 2008, que é diferente da data de abertura do CNPJ principal (2017).
+### 6.1 Ficha técnica
+- **Título:** "Bem Vindo à Consentra!"
+- **Canal:** Consentra (@consentra). **Visibilidade:** não listado.
+- **Data de envio:** 18/01/2023. **Duração:** 1:26.
+- **Visualizações:** 106. **Curtidas:** 1. **Categoria:** People & Blogs.
+- **Apresentador:** "Assis", que se identifica no início do vídeo.
+
+### 6.2 O que foi analisado, e o que não foi
+- **Foram lidos:** a transcrição completa, gerada automaticamente pelo YouTube, a descrição completa e os metadados da página.
+- **Não foi possível analisar:** imagens, aparência do apresentador, gráficos, logos ou textos na tela, porque o acesso que tenho é ao texto da página, não ao arquivo de vídeo nem ao áudio.
+- **Limitação da transcrição:** é automática e tem erros de reconhecimento de voz. Os marcadores [Música] e [Aplausos] indicam sons, não falas. Não há marcação de tempo disponível.
+
+### 6.3 Transcrição integral (literal, como gerada pelo YouTube)
+
+```text
+[Música]
+[Aplausos]
+Olá seja muito bem vindo a concentra
+soluções de segurança trabalho eu me
+chamo Assis e estou aqui para apresentar
+um pouquinho da nossa empresa a
+concentra ela realiza ferramentas
+trabalho que visam reduzir custos por
+SSD dentro da sua empresa e o principal
+benefício à redução de acidentes de
+trabalho
+também realiza projetos projetos de
+adaptação projetos de instalação e
+instalações de pontos ancoragem e dentre
+outros projetos na área da segurança do
+trabalho bem como também estamos mexendo
+com locações
+locações de equipamentos
+[Música]
+atendendo todas as normas legislações
+o nosso banco de dados internos
+promovendo assim sempre é uma
+atualização das informações prestadas
+por todo nossa empresa a vocês nossa
+equipe estamos ansiosa para lhe atender
+e fazer e desejar uma parceria de
+sucesso entre em contato conosco pelo
+nosso WhatsApp ou por e-mails
+disponíveis em nosso site Muito obrigado
+[Música]
+```
+
+### 6.4 Transcrição revisada (com correções prováveis)
+
+Esta versão corrige erros evidentes da transcrição automática. Os trechos marcados com [?] são incertos e foram mantidos como estão.
+
+> [Música] [Aplausos]
+>
+> Olá, seja muito bem-vindo à Consentra Soluções em Segurança do Trabalho. Eu me chamo Assis e estou aqui para apresentar um pouquinho da nossa empresa.
+>
+> A Consentra realiza [trabalhos? ferramentas? — trecho incerto] que visam reduzir custos com SST dentro da sua empresa. O principal benefício é a redução de acidentes de trabalho.
+>
+> Também realizamos projetos: projetos de adequação, projetos de instalação e instalação de pontos de ancoragem, e outros projetos na área de segurança do trabalho. Também estamos trabalhando com locação de equipamentos.
+>
+> [Música]
+>
+> Atendemos todas as normas e legislações. Nosso banco de dados interno é sempre atualizado, para manter as informações que prestamos a vocês sempre atuais.
+>
+> Nossa equipe está ansiosa para atender vocês e desejar uma parceria de sucesso. Entre em contato conosco pelo WhatsApp ou pelos e-mails disponíveis em nosso site. Muito obrigado.
+>
+> [Música]
+
+### 6.5 Descrição do vídeo (texto integral publicado pela empresa)
+
+> Uma empresa especializada que oferece produtos e serviços empresariais nas áreas de Segurança do Trabalho. Desde 2008 busca a satisfação de seu cliente oferecendo produtos e serviços que melhor atendam a sua necessidade. Para isso conta com uma constante atualização em seu banco de dados interno, visando informações precisas para não haver falhas e nem erros.
+>
+> A CONSENTRA possui conhecimentos e experiências em coordenação de projetos e serviços; Gestão de documentos legais em segurança do trabalho, tais como: implantação de programas e treinamentos de SST (Saúde e Segurança no Trabalho) para atendimento de empresas certificadoras; Elaboração de procedimentos internos e redução de acidentes e custos de SST. Conta também com ferramentas constituídas de: Indústria Petroquímica, Refinaria, Metalúrgica, Indústria de celulose, Indústria automotiva e Obras pesadas.
+
+### 6.6 Leitura do conteúdo
+
+**Mensagem central:** o vídeo apresenta a empresa em 1 minuto e 26 segundos, com três pontos: redução de custos e acidentes com SST, projetos (incluindo pontos de ancoragem) e locação de equipamentos.
+
+**O que o vídeo confirma**
+- O apresentador se chama Assis, o que corresponde ao sócio-administrador Washington Feliciano Fontes de Assis (identificação provável, não confirmada pelo vídeo).
+- Serviços: projetos de adequação e instalação de pontos de ancoragem, e locação de equipamentos. Ambos aparecem no catálogo do site.
+- Atendimento a normas e legislações, e banco de dados interno atualizado. Também aparecem no site.
+- Contato por WhatsApp e e-mail do site. O vídeo não fala nenhum número de telefone.
+
+**O que o vídeo não traz**
+- Nenhum nome de equipe técnica, registro profissional (CREA ou equivalente) ou responsável técnico.
+- Nenhum cliente nomeado, caso de estudo ou número de projetos realizados.
+- Nenhuma menção a exames ocupacionais ou clínica própria.
+- Nenhuma data de fundação. A descrição diz "Desde 2008", o que é diferente da data de abertura do CNPJ principal (2017). Essa é a mesma inconsistência registrada na seção 2.
+
+**Pontos de atenção**
+- A linguagem é genérica: "atendemos todas as normas e legislações" é uma afirmação ampla, sem exemplos nem fontes.
+- A descrição lista setores atendidos (petroquímica, refinaria, metalúrgica, celulose, automotiva e obras pesadas), mas não diz quais clientes ou contratos existem. Além disso, o trecho está confuso: diz que a empresa "conta também com ferramentas constituídas de" esses setores, o que provavelmente quer dizer "setores atendidos".
+- O vídeo tem apenas 106 visualizações e uma curtida, e está como "não listado". Ou seja, não é uma peça de divulgação pública ativa.
+- Os vídeos de apresentação do site (home) e do YouTube são o mesmo conteúdo.
 
 ---
 
@@ -272,7 +362,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 - [ ] Verificar as avaliações no **Google** (buscar "Consentra Araucária" pelo celular).
 - [ ] Confirmar o CNPJ **15.499.834/0001-60** na Receita Federal e a relação com o CNPJ principal.
 - [ ] Confirmar a data de fundação ("2008" ou "2017") com documentos da empresa.
-- [ ] Assistir ao vídeo de apresentação e registrar apresentação, imagens e tom (a análise atual usa só a transcrição automática).
+- [ ] Analisar as imagens do vídeo de apresentação (aparência, logos, textos na tela), se houver uma cópia do arquivo ou capturas de tela. A transcrição e a descrição já foram analisadas na seção 6.
 - [ ] Confirmar a localização da Contrei e da PSEG em Araucária.
 - [ ] Verificar o perfil no Reclame Aqui com o endereço correto da empresa, se existir.
 - [ ] Acompanhar se o blog volta a publicar.
