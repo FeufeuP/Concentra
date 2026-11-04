@@ -147,14 +147,14 @@
     width: 100% !important;
     max-width: 190mm !important;
     height: auto !important;
-    max-height: 277mm !important;
+    max-height: none !important;
     padding: 0 !important;
     box-sizing: border-box !important;
-    page-break-after: avoid !important;
-    page-break-inside: avoid !important;
-    break-after: avoid !important;
-    break-inside: avoid !important;
-    overflow: hidden !important;
+    page-break-after: auto !important;
+    page-break-inside: auto !important;
+    break-after: auto !important;
+    break-inside: auto !important;
+    overflow: visible !important;
   }
 }
 
