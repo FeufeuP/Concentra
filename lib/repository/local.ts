@@ -107,8 +107,12 @@ export function createLocalRepository(
       return ok(list.length);
     },
 
-    async saveClient(client) {
-      return write(LOCAL_CLIENTS_KEY, [client, ...clients().filter(c => c.id !== client.id)]);
+    async saveClient(client, isNew) {
+      const list = clients();
+      const exists = list.some(c => c.id === client.id);
+      if (isNew && exists) return { success: false, error: 'Já existe um cliente com este identificador.' };
+      if (!isNew && !exists) return { success: false, error: 'O cliente foi removido. Recarregue os dados.' };
+      return write(LOCAL_CLIENTS_KEY, [client, ...list.filter(c => c.id !== client.id)]);
     },
 
     async deleteClient(clientId) {

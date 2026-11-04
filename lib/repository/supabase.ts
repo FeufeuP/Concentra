@@ -43,7 +43,7 @@ export function createSupabaseRepository(): DataRepository {
     saveQuote: async (quote) => toResult(await saveQuoteToSupabase(quote)),
     deleteQuote: async (id) => toResult(await deleteQuoteFromSupabase(id)),
     clearAllQuotes: (confirmation) => clearAllQuotesInSupabase(confirmation),
-    saveClient: async (client) => toResult(await saveClientToSupabase(client)),
+    saveClient: async (client, isNew) => toResult(await saveClientToSupabase(client, isNew)),
     deleteClient: async (id) => toResult(await deleteClientFromSupabase(id)),
     saveService: async (service) => toResult(await saveCatalogService(service)),
     deleteService: async (id) => toResult(await deleteCatalogService(id)),

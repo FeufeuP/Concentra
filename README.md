@@ -1,12 +1,12 @@
 # Consentra · Gestão de SST
 
-[![Site](https://img.shields.io/badge/site-feufeup.github.io%2FConcentra-1f6feb?logo=githubpages&logoColor=white)](https://feufeup.github.io/Concentra/)
+[![Site](https://img.shields.io/badge/site-consentra--sst--psi.vercel.app-000000?logo=vercel&logoColor=white)](https://consentra-sst-psi.vercel.app)
 [![Release](https://img.shields.io/github/v/release/FeufeuP/Concentra?label=release&color=2ea043)](https://github.com/FeufeuP/Concentra/releases/latest)
 [![CI](https://github.com/FeufeuP/Concentra/actions/workflows/ci.yml/badge.svg)](https://github.com/FeufeuP/Concentra/actions/workflows/ci.yml)
 [![Deploy](https://github.com/FeufeuP/Concentra/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/FeufeuP/Concentra/actions/workflows/deploy-pages.yml)
 [![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-3fb950)](./LICENSE)
 
-**🌐 Site:** <https://feufeup.github.io/Concentra/> · **📦 Última versão:** [v2.4.0](https://github.com/FeufeuP/Concentra/releases/latest)
+**🌐 Site (Vercel):** <https://consentra-sst-psi.vercel.app> · **📦 Última versão:** [v2.4.0](https://github.com/FeufeuP/Concentra/releases/latest)
 
 Sistema web para **emissão de orçamentos e propostas técnicas de Saúde e Segurança do Trabalho (SST)**,
 com pipeline comercial, cadastro de clientes, catálogo de serviços (NRs, laudos, treinamentos, eSocial),
@@ -48,7 +48,7 @@ relatórios e geração de PDF.
 
 ## Requisitos
 
-- **Node.js 20.9+** para rodar o app; **22.12+** para rodar os testes (Vitest 5). Recomendado: 22 LTS
+- **Node.js 22 LTS** (22.12+ para os testes com Vitest 5). A mesma versão principal é usada no CI e na Vercel
 - npm 10+
 
 ## Como rodar
@@ -117,6 +117,55 @@ O CI (`.github/workflows/ci.yml`) roda lint, typecheck, testes e build em cada p
 
 > Para abrir o servidor de desenvolvimento por um domínio de preview/túnel, defina
 > `ALLOWED_DEV_ORIGINS` (ex.: `ALLOWED_DEV_ORIGINS="*.ngrok.app" npm run dev`).
+
+## Publicar na Vercel
+
+**Endereço:** <https://consentra-sst-psi.vercel.app> · **Projeto:** `consentra-sst` (equipe `FVLP`).
+
+O projeto está vinculado ao repositório `FeufeuP/Concentra`. A branch de produção da integração é
+`main`: novos pushes nela geram deploys de produção; outras branches geram previews. Uma publicação
+manual de outra branch não altera essa configuração. Alterações feitas nesta sessão estão em
+`arena/86d03fa8-concentra`; integre-as por pull request para que continuem nos próximos deploys da `main`.
+
+Configuração do projeto (também em [`vercel.json`](./vercel.json)):
+
+| Opção | Valor |
+|---|---|
+| Framework | Next.js |
+| Root Directory | raiz do repositório |
+| Install Command | `npm ci` |
+| Build Command | `npm run build` |
+| Output Directory | padrão do Next.js (não definir `out`) |
+| Node.js | `22.x`, definido em `package.json` |
+
+**Não defina `GITHUB_PAGES=true` nem `NEXT_PUBLIC_BASE_PATH=/Concentra` na Vercel.** O app é servido
+na raiz do domínio, sem `/Concentra`. O deploy do GitHub Pages continua disponível separadamente.
+
+### Banco e autenticação no site publicado
+
+Sem as variáveis abaixo, o site funciona em **modo local de demonstração**: dados ficam apenas no
+navegador, não são compartilhados entre usuários/dispositivos e o login local não protege dados reais.
+Publicar em outro domínio **não transfere** o `localStorage` do site anterior.
+
+Para usar o banco existente, primeiro confirme que o projeto Supabase está **ativo**, com esquema e
+políticas RLS configurados. Depois, em **Vercel → Settings → Environment Variables**, adicione:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: URL do projeto Supabase.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: chave pública anon/publishable (nunca a `service_role`).
+
+Aplique em **Production** e faça um novo deploy: variáveis `NEXT_PUBLIC_*` são incorporadas no build.
+Para previews com dados reais, use um ambiente de homologação em vez do banco de produção.
+No Supabase, em **Authentication → URL Configuration**, configure o *Site URL* de produção e acrescente
+`https://consentra-sst-psi.vercel.app/**` às *Redirect URLs*, preservando os endereços ainda utilizados.
+
+### Usar um domínio próprio depois
+
+O endereço `.vercel.app` é gratuito e não exige registro nem alterações manuais no DNS. Para trocar
+por um domínio próprio já registrado, abra **Vercel → Settings → Domains → Add Domain**, informe o
+domínio exato e copie os registros DNS indicados pela Vercel para o provedor do domínio. Não altere
+registros de e-mail (MX/SPF/DKIM). Aguarde a verificação e a emissão do certificado HTTPS; depois
+atualize também as URLs de autenticação no Supabase. O registro de um domínio próprio é separado da
+hospedagem na Vercel.
 
 ## Publicar no GitHub Pages
 
@@ -227,7 +276,7 @@ valem os padrões do código (`lib/mock-data.ts`, `lib/company.ts`).
 
 **Dados antigos do navegador:** se o sistema foi usado no modo local antes de conectar o Supabase,
 **Configurações** mostra o cartão *"Dados salvos somente neste navegador"* para importar orçamentos,
-clientes e configurações. Números já usados no servidor são renumerados, e é seguro repetir a importação.
+clientes e configurações. Documentos novos recebem números reservados no servidor, e recibos persistentes tornam a repetição segura.
 
 **Recuperação de senha:** o usuário recebe um link por e-mail e define a nova senha no próprio
 sistema. O SMTP padrão do Supabase só envia para membros da equipe do projeto e tem limite baixo
@@ -282,3 +331,43 @@ funcionalidades) estão em [`MELHORIAS.md`](./MELHORIAS.md).
 ## Licença
 
 [MIT](./LICENSE)
+
+### Segurança de persistência e importação
+
+- Cadastros novos de clientes usam UUID e **INSERT**. Edições usam **UPDATE** e exigem
+  confirmação de uma linha afetada; uma colisão nunca substitui outro cadastro.
+- Configurações só atualizam o cache e mostram sucesso depois da confirmação do
+  servidor. Uma falha não bloqueia novas tentativas. Logos anteriores são preservados.
+- Listagens de orçamentos, itens, clientes, catálogo e configurações percorrem todas
+  as páginas, com ordenação estável. Erros não são apresentados como listas completas.
+- Em um banco existente da Fase 5, aplique **`supabase/upgrade_import_safety.sql` antes
+  de publicar esta versão**. A migração é aditiva: cria recibos de importação e a RPC
+  `import_quote`, sem alterar orçamentos/clientes/usuários existentes. O schema completo
+  já contém essa atualização para instalações novas.
+- A importação confirma orçamento, itens, histórico e recibo numa única transação.
+  Repetir a operação, inclusive após perda de resposta ou em outra sessão, não duplica
+  o documento nem desfaz edições posteriores. Documentos novos recebem numeração do
+  servidor. Configurações não autorizadas continuam pendentes para um administrador;
+  originais no navegador são preservados.
+
+#### Homologação
+
+`npm test` inclui regressões de interface e integração com PostgreSQL isolado
+(PGlite). Nesses testes o transporte HTTP e a identidade são simulados; eles **não**
+comprovam autenticação de produção por si sós.
+
+O teste Playwright em `tests/e2e/persistence.spec.ts` valida o site real: login,
+cadastro, orçamento com itens, logout, novo contexto de navegador, releitura,
+edição, histórico, importação concorrente e permissões. Catálogo/configurações usam
+somente chaves exclusivas de teste; configurações reais da empresa não são alteradas.
+
+A execução de produção é **opt-in** (workflow manual ou commit com
+`[persistence-e2e]` na branch autorizada; `[persistence-target:<sha>]` permite validar
+um commit já publicado sem republicar mudanças só de testes). Requer provisionar temporariamente a
+função `persistence-test-fixture` com `verify_jwt: false` **e a validação OIDC interna
+intacta**: assinatura, emissor, audiência, IDs do repositório, branch, workflow e
+prazo. Nunca aceita visitantes nem senhas de usuários reais; usa a service role
+somente dentro do servidor para criar/remover suas próprias fixtures. O workflow
+sempre tenta a limpeza, não publica credenciais/trace/screenshots e não usa secrets
+administrativos no navegador. **Remova a função remota após homologar**; a janela
+fixa expira e precisa ser revista explicitamente para uma futura execução.

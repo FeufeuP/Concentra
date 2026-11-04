@@ -23,7 +23,7 @@ interface PdfVisualizerViewProps {
   onOpenServiceOrder?: (quote: Quote) => void;
   responsiblePersons?: string[];
   currentUser?: AuthUser | null;
-  onSaveQuote?: (updatedQuote: Quote) => void;
+  onSaveQuote?: (updatedQuote: Quote) => Promise<Quote | null>;
 }
 
 export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
@@ -518,11 +518,7 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
         isOpen={showAdminModal}
         onClose={() => setShowAdminModal(false)}
         quote={quote}
-        onApplyToQuote={(updatedQuote) => {
-          if (onSaveQuote) {
-            onSaveQuote(updatedQuote);
-          }
-        }}
+        onApplyToQuote={async (updatedQuote) => Boolean(await onSaveQuote?.(updatedQuote))}
         initialTab={adminModalTab}
       />
     </div>

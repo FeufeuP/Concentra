@@ -309,7 +309,7 @@ function addToResponsibles(user: AuthUser): void {
   // Responsáveis técnicos passam a aparecer na lista de "Responsável pelo Orçamento"
   if (user.role !== 'Responsável Técnico' && user.role !== 'Responsável Técnico e Administrador') return;
   try {
-    addStoredResponsible(user.name);
+    void addStoredResponsible(user.name).catch(() => { /* Falha secundária, notificada pela sincronização. */ });
   } catch {
     // erro secundário — ignora
   }

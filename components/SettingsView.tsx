@@ -71,8 +71,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // 1. Identificação da Empresa Emissora
   const handleSaveSection1 = () => {
     if (!ensureCanEditCompany()) return;
-    triggerSectionSave('sec-1', () => {
-      const saved = saveStoredCompanyProfile(profile);
+    void triggerSectionSave('sec-1', async () => {
+      const saved = await saveStoredCompanyProfile(profile);
       setProfile(saved);
     }, '1. Identificação da Empresa salva com sucesso!');
   };
@@ -80,8 +80,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // 2. Responsável Técnico & Emissão de ART
   const handleSaveSection2 = () => {
     if (!ensureCanEditCompany()) return;
-    triggerSectionSave('sec-2', () => {
-      const saved = saveStoredCompanyProfile(profile);
+    void triggerSectionSave('sec-2', async () => {
+      const saved = await saveStoredCompanyProfile(profile);
       setProfile(saved);
     }, '2. Responsável Técnico & ART salvos com sucesso!');
   };
@@ -89,8 +89,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // 3. Dados Bancários para Pagamentos & PIX
   const handleSaveSection3 = () => {
     if (!ensureCanEditCompany()) return;
-    triggerSectionSave('sec-3', () => {
-      const saved = saveStoredCompanyProfile(profile);
+    void triggerSectionSave('sec-3', async () => {
+      const saved = await saveStoredCompanyProfile(profile);
       setProfile(saved);
     }, '3. Dados Bancários e Chave PIX salvos com sucesso!');
   };
@@ -98,9 +98,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!ensureCanEditCompany()) return;
-    triggerSectionSave('global', () => {
+    void triggerSectionSave('global', async () => {
       // 1. Salvar dados cadastrais e bancários da empresa
-      const saved = saveStoredCompanyProfile(profile);
+      const saved = await saveStoredCompanyProfile(profile);
       setProfile(saved);
 
       // 2. Feedback visual no topo e no botão
@@ -437,9 +437,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         isOpen={showAdminModal}
         onClose={() => setShowAdminModal(false)}
         initialTab={adminModalTab}
-        onApplyToQuote={() => {
-          showToast('Configurações globais de cabeçalho e textos atualizadas com sucesso!');
-        }}
       />
 
     </div>

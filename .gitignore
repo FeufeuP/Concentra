@@ -35,3 +35,8 @@ Thumbs.db
 
 # deploy
 .vercel
+
+# homologação (nunca versionar sessões/credenciais/artefatos de navegador)
+/.e2e/
+/test-results/
+/playwright-report/

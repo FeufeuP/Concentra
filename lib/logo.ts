@@ -33,8 +33,9 @@ export function getStoredLogoUrl(): string {
  * arquivo é feito antes, com `uploadLogoToStorage`); no modo local, um data URL.
  * Retorna false se não couber no armazenamento do navegador.
  */
-export function saveStoredLogoUrl(logoUrl: string): boolean {
+export async function saveStoredLogoUrl(logoUrl: string): Promise<boolean> {
   if (typeof window === 'undefined') return false;
+  if (!logoUrl.startsWith('data:')) await pushSetting(SETTING_KEYS.logo, logoUrl);
   try {
     localStorage.setItem(LOGO_STORAGE_KEY, logoUrl);
   } catch (err) {
@@ -42,22 +43,18 @@ export function saveStoredLogoUrl(logoUrl: string): boolean {
     return false;
   }
   window.dispatchEvent(new CustomEvent('consentra_logo_updated', { detail: logoUrl }));
-  // Nunca envia base64 para o banco: no modo Supabase o logo vive no Storage
-  if (!logoUrl.startsWith('data:')) {
-    pushSetting(SETTING_KEYS.logo, logoUrl);
-  }
   return true;
 }
 
-export function clearStoredLogoUrl(): void {
+export async function clearStoredLogoUrl(): Promise<void> {
   if (typeof window === 'undefined') return;
+  await pushSetting(SETTING_KEYS.logo, null);
   try {
     localStorage.removeItem(LOGO_STORAGE_KEY);
     window.dispatchEvent(new CustomEvent('consentra_logo_updated', { detail: DEFAULT_LOGO_URL }));
   } catch (err) {
     console.error('Erro ao redefinir logo corporativa:', err);
   }
-  pushSetting(SETTING_KEYS.logo, null);
 }
 
 /** Aplica o logotipo vindo do servidor (substitui o cache local, sem reenviar). */

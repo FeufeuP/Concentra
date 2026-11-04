@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { BrandLogo } from './ui/BrandLogo';
+import { useToast } from './ui/ToastProvider';
 import { Quote } from '@/lib/types';
 import { getStoredCompanyProfile, CompanyProfile } from '@/lib/company';
 import { getStoredLogoUrl } from '@/lib/logo';
@@ -27,6 +28,7 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
   onClose,
   responsiblePersons = [],
 }) => {
+  const showToast = useToast();
   const [responsibles, setResponsibles] = useState<string[]>(() => {
     const list = responsiblePersons.length > 0 ? responsiblePersons : getStoredResponsibles();
     return sanitizeResponsibles(list);
@@ -132,19 +134,25 @@ export const ServiceOrderModal: React.FC<ServiceOrderModalProps> = ({
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
-  const handleAddNewResponsible = () => {
+  const handleAddNewResponsible = async () => {
     if (!newResponsibleInput.trim()) return;
-    const updated = addStoredResponsible(newResponsibleInput.trim());
-    setResponsibles(updated);
-    setResponsibleName(newResponsibleInput.trim());
-    setNewResponsibleInput('');
+    try {
+      const updated = await addStoredResponsible(newResponsibleInput.trim());
+      setResponsibles(updated);
+      setResponsibleName(newResponsibleInput.trim());
+      setNewResponsibleInput('');
+    } catch (err) {
+      showToast(`Responsável não salvo: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
+    }
   };
 
-  const handleRemoveResponsible = (name: string) => {
-    const updated = removeStoredResponsible(name);
-    setResponsibles(updated);
-    if (responsibleName === name && updated.length > 0) {
-      setResponsibleName(updated[0]);
+  const handleRemoveResponsible = async (name: string) => {
+    try {
+      const updated = await removeStoredResponsible(name);
+      setResponsibles(updated);
+      if (responsibleName === name && updated.length > 0) setResponsibleName(updated[0]);
+    } catch (err) {
+      showToast(`Responsável não removido: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
     }
   };
 
