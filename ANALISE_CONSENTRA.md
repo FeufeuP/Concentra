@@ -521,7 +521,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 - **Carrossel de clientes** com cerca de 20 indicadores de paginação. Mostra três logotipos por vez, o que sugere rotação automática ou deslize.
 - **Carrossel horizontal de depoimentos:** o último cartão aparece cortado na borda, indicando rolagem horizontal.
 - **Vídeo em pop-up:** a miniatura tem botão de play. A reprodução abre em janela própria.
-- **Mapa interativo:** a aviso "Utilize dois dedos para mover o mapa" aparece na tela.
+- **Mapa interativo:** o aviso "Utilize dois dedos para mover o mapa" aparece na tela.
 - **Menu hambúrguer:** o menu fica recolhido no celular.
 
 **Provável, mas não confirmado (exige vídeo ou inspeção do código):**
