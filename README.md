@@ -362,7 +362,8 @@ edição, histórico, importação concorrente e permissões. Catálogo/configur
 somente chaves exclusivas de teste; configurações reais da empresa não são alteradas.
 
 A execução de produção é **opt-in** (workflow manual ou commit com
-`[persistence-e2e]` na branch autorizada). Requer provisionar temporariamente a
+`[persistence-e2e]` na branch autorizada; `[persistence-target:<sha>]` permite validar
+um commit já publicado sem republicar mudanças só de testes). Requer provisionar temporariamente a
 função `persistence-test-fixture` com `verify_jwt: false` **e a validação OIDC interna
 intacta**: assinatura, emissor, audiência, IDs do repositório, branch, workflow e
 prazo. Nunca aceita visitantes nem senhas de usuários reais; usa a service role

@@ -1,10 +1,12 @@
 // Runs in GitHub Actions, not in the app. No service-role or real-user passwords.
 import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 const base = 'https://consentra-sst-psi.vercel.app';
 const endpoint = 'https://bdpapewphroxsbrnqpst.supabase.co/functions/v1/persistence-test-fixture';
 const op = process.argv[2];
-const expectedSha = process.env.PERSISTENCE_TARGET_SHA || process.env.GITHUB_SHA;
+const targetTag = /\[persistence-target:([0-9a-f]{40})\]/.exec(execFileSync('git', ['log', '-1', '--pretty=%B'], { encoding: 'utf8' }));
+const expectedSha = process.env.PERSISTENCE_TARGET_SHA || targetTag?.[1] || process.env.GITHUB_SHA;
 if (op === 'wait') {
   const deadline = Date.now() + 8 * 60_000;
   let ready = false;

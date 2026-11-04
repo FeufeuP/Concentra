@@ -21,7 +21,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[persistence-e2e]'))
     runs-on: ubuntu-latest
     env:
-      PERSISTENCE_TARGET_SHA: ${{ inputs.target_sha || github.sha }}
+      PERSISTENCE_TARGET_SHA: ${{ inputs.target_sha }}
     timeout-minutes: 15
     permissions:
       contents: read
