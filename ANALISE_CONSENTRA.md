@@ -24,7 +24,8 @@
 11. [Veredito e pontos de atenção](#11-veredito-e-pontos-de-atenção)
 12. [Perguntas antes de contratar](#12-perguntas-antes-de-contratar)
 13. [Pendências](#13-pendências)
-14. [Fontes](#14-fontes)
+14. [Estrutura e design do site](#14-estrutura-e-design-do-site)
+15. [Fontes](#15-fontes)
 
 ---
 
@@ -369,7 +370,120 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 
 ---
 
-## 14. Fontes
+## 14. Estrutura e design do site
+
+> Análise feita a partir do conteúdo renderizado (textos, links e nomes de arquivos de imagem) e da API pública do WordPress. **Não foi possível medir** cores, fontes, espaçamentos, comportamento responsivo nem velocidade de carregamento, porque o acesso não entrega CSS nem captura de tela. Os padrões visuais abaixo são inferidos da estrutura.
+
+### 14.1 Plataforma e tecnologia
+- **WordPress**, com a página inicial configurada como página estática (ID 64).
+- **Elementor** (com versões Pro e AI), tema **Hello Elementor**, **HFE** (cabeçalho e rodapé) e **ElementsKit** (componentes extras). Os namespaces da API pública indicam esses componentes.
+- **WP Super Cache** (cache de páginas) e **Google Site Kit** (integração com serviços Google).
+- **Trustindex** (widget de avaliações) está instalado, mas a API não retorna nenhum widget ativo. A origem dos depoimentos da página não foi identificada (ver 14.6).
+- **Envato Elements** (biblioteca de templates), o que sugere layout baseado em kit pronto.
+- Sitemap XML nativo do WordPress.
+
+### 14.2 Navegação
+- **Cabeçalho:** logotipo e links para Facebook, YouTube e Instagram. O menu principal não aparece no conteúdo capturado, então não é possível descrever a ordem dos itens.
+- **Páginas principais:** Início, Serviços, Quem somos, Blog (com paginação) e artigos individuais.
+- **Links quebrados:** `/sobre` e `/contato` retornam 404. O menu pode conter itens antigos ou a navegação depende de botões internos.
+- **Âncoras:** os cards de serviço da home levam a `/servicos#laudos`, `#GRO`, `#treinamentos`, `#locacao`, `#projetos` e `#assessoria`.
+- **Breadcrumb:** não existe na home. Nos artigos, aparece "Início > Blog".
+- **Link de endereço:** o link "Endereço" da home aponta para `#`, então não leva a um mapa.
+- **Rodapé:** não apareceu no conteúdo capturado, exceto pelo widget de atendimento flutuante.
+
+### 14.3 Estrutura da página inicial (de cima para baixo)
+1. **Cabeçalho** com logotipo e redes sociais.
+2. **Hero:** rótulo "Segurança e Saúde do Trabalho", título "SOMOS A CONSENTRA", frase "Oferecemos TODOS os serviços de saúde e segurança do trabalho para sua empresa!" e botão "Fale conosco (41) 99694-3025", que abre o WhatsApp com mensagem pré-preenchida.
+3. **Indicadores:** 5000+ vidas treinadas e capacitadas, 700+ projetos feitos, 3000+ clientes atendidos.
+4. **Imagens com selo** "16+ Anos de Experiência" e o rótulo "Protegendo o que mais importa".
+5. **Apresentação:** título "Proteja sua equipe com soluções completas em segurança do trabalho", dois parágrafos, lista de seis áreas e botão "SAIBA MAIS!" para `/servicos`.
+6. **Diferencial:** rótulo "Por que a CONSENTRA?" e três cards numerados (01, 02 e 03).
+7. **Nossos serviços:** seis cards (Laudos Técnicos, Gestão em SST, Treinamentos e Palestras, Locação de Equipamentos, Projetos de Engenharia e Consultoria Especializada), cada um com "Saiba mais".
+8. **Clientes:** grade de logotipos, com alguns repetidos.
+9. **Depoimentos:** oito cartões com "Publicado em", nome e texto.
+10. **Vídeo:** "Bem-Vindo(a) A CONSENTRA!", em pop-up com o vídeo do YouTube.
+11. **Canais de contato:** endereço, telefone e dois e-mails (comercial e dúvidas).
+12. **Widget flutuante:** "Fale com a CONSENTRA", com "Olá! Como podemos ajudar?", "Quero falar com o comercial!" e um código QR.
+
+### 14.4 Página de serviços
+- Abre com o título "Conheça mais sobre os nossos serviços" e um texto introdutório.
+- Organizada em **blocos por área** (Treinamentos, Laudos, Gestão em GRO e outras). Cada bloco tem imagem, título, texto, lista de itens e botão de orçamento.
+- Os itens de treinamento e de laudo são **recolhíveis (acordeão)**: cada um tem título em caixa alta e um texto que se abre ao clique. Os identificadores `collapse-` indicam o componente de acordeão do Elementor.
+- O botão "Solicite um orçamento" (WhatsApp) aparece ao fim de cada bloco, pelo menos nos blocos de treinamentos e laudos.
+- Galeria "Alguns de nossos treinamentos" com fotos em formato de WhatsApp.
+- **Nome inconsistente:** a home diz "Gestão em SST" e a página de serviços diz "Gestão em GRO".
+
+### 14.5 Página Quem somos
+- Título "QUEM SOMOS NÓS" e a frase "Desde 2008...".
+- Bloco "Nosso Compromisso" com o título "CONSENTRA há 16 anos no mercado!". **A mesma página diz 2008 e 16 anos**, que é uma conta de 2024. Em 2026, seriam 18 anos.
+- Os três cards de diferencial são **idênticos** aos da home.
+- "Nossa Equipe": texto genérico com imagem gerada por IA (Adobe Firefly, 09/2024). Não há fotos nem nomes da equipe.
+- "Projetos que apoiamos": seis miniaturas, mas só **duas imagens distintas**, repetidas três vezes cada.
+- "Time de Futsal": patrocínio ao futsal feminino de Quatro Barras, com "média de 50 meninas" treinando.
+- Clientes, depoimentos e canais de contato repetem exatamente o conteúdo da home.
+
+### 14.6 Blocos repetidos e prova social
+- Entre a home e a página Quem somos se repetem: os três cards de diferencial, a grade de clientes, os oito depoimentos e os canais de contato.
+- Os depoimentos seguem o formato "Publicado em / nome / texto", **sem data visível**. Esse formato é típico de widgets de avaliações. Não é possível dizer se vêm do Google ou se foram digitados no site. Vale verificar a origem, porque o plugin Trustindex está instalado.
+
+### 14.7 Blog
+- **Listagem:** 8 posts por página, com paginação em `/blog/page/2/`.
+- **Artigo:** "Início > Blog" no topo, título, data (link para o arquivo do dia), imagem de destaque, texto com subtítulos, botão de orçamento, formulário de comentário e "Veja Também" com três artigos relacionados.
+- **Categorias:** "Informativos" e "Normas regulamentadoras".
+- **Estrutura de texto repetida:** introdução, "Para que serve", "Consequências", "Como a Consentra pode ajudar", conclusão e CTA.
+- **Comentários** estão habilitados, mas nenhum comentário apareceu.
+
+### 14.8 Mecânicas de design e padrões visuais
+- **Seção em três camadas:** rótulo pequeno (eyebrow), título grande, depois texto ou cards. Aparece em quase todas as seções.
+- **Grades:** cards de 2 a 3 colunas (diferencial), 6 cards (serviços) e grade de logotipos (clientes).
+- **Numeração** 01, 02 e 03 nos cards de diferencial, como recurso de organização visual.
+- **Chamadas para ação:** pelo menos cinco rótulos diferentes para o mesmo destino (WhatsApp): "Fale conosco", "SAIBA MAIS!", "Saiba mais", "Solicite um orçamento" e "Quero Pedir um Orçamento". Vale padronizar.
+- **Mensagem pré-preenchida** no WhatsApp: "Olá CONSENTRA Vim Pelo Site e Quero mais informações". Ajuda a identificar a origem do contato.
+- **Vídeo em pop-up** com reprodução automática configurada (`autoplay=1`). Navegadores costumam bloquear autoplay com som, então o efeito pode ser inesperado para o visitante.
+- **Widget flutuante** de atendimento, no canto da tela, direcionado ao WhatsApp.
+- **Imagens sem padrão:** fotos de WhatsApp (nomes como `WhatsApp-Image-2024-09-17`), imagens de bancos gratuitos (Pexels e Pixabay), arte gerada por IA e logotipos de clientes. A falta de um padrão fotográfico enfraquece a identidade visual.
+- **Cores e tipografia:** não foi possível medir. O logotipo está em arquivo horizontal (`Logo-consentra-1-1024x250.png`).
+
+### 14.9 Acessibilidade e SEO (pelo que aparece no conteúdo)
+**Pontos positivos**
+- Link "Skip to content" (pular para o conteúdo) presente.
+- Título da página com termo local: "Consentra Soluções em Segurança do Trabalho – Segurança do Trabalho em Araucária | Consentra".
+- Sitemap XML ativo e URLs legíveis em português.
+- Hierarquia de títulos (H1, H2, H3) usada na maioria das páginas.
+
+**Problemas**
+- **Textos alternativos inadequados:** "Manter", "manter", "Manter Home" e nomes de arquivo como `19-THA-1-1024x671`. Leitores de tela leem isso sem sentido.
+- **Logotipo do cabeçalho sem texto alternativo.**
+- **Link de endereço** com destino `#`.
+- **Caixa alta** em vários títulos ("SOMOS A CONSENTRA", "QUEM SOMOS NÓS" e títulos de acordeão), o que dificulta a leitura.
+- **Não verificados:** contraste de cores, navegação por teclado e banner de cookies.
+- **Política de privacidade** não apareceu no conteúdo capturado.
+
+### 14.10 Desempenho e manutenção
+- **Cache** ativo (WP Super Cache).
+- **Imagens duplicadas** na mesma página (Quem somos e clientes) aumentam o peso da página e dificultam a manutenção.
+- **Plugins** em número considerável: Elementor Pro, ElementsKit, HFE, Trustindex, Google Site Kit, WP Super Cache, Envato Elements e Elementor AI. Não foram verificadas as versões nem as atualizações.
+- **API pública** expõe a lista de plugins. Não é falha por si, mas facilita identificar versões vulneráveis. Vale revisar a configuração.
+- **Sitemap de autores** expõe o slug "jovineconsentra-com-br" (já mencionado na seção 8).
+- **Não medidos:** velocidade de carregamento (Core Web Vitals) e responsividade para celular.
+
+### 14.11 Resumo da estrutura
+**Pontos fortes**
+- Estrutura clara, com seções previsíveis e uma sequência lógica (apresentação, diferencial, serviços, prova social e contato).
+- CTAs para WhatsApp em destaque, com mensagem pré-preenchida.
+- Serviços separados por área, com acordeões que evitam páginas longas demais.
+- Blog com links internos entre artigos.
+
+**Pontos fracos**
+- Conteúdo repetido entre páginas (diferencial, clientes, depoimentos e contato).
+- Rótulos de CTA inconsistentes.
+- Imagens sem padrão, com textos alternativos ruins e duplicadas.
+- Dados de contato divergentes e marco histórico inconsistente ("2008", "16 anos" e CNPJ de 2017).
+- Prova social sem data nem origem identificada.
+
+---
+
+## 15. Fontes
 
 **Site e canais da Consentra**
 - https://consentra.com.br/ (página inicial)
@@ -378,6 +492,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 - https://consentra.com.br/blog
 - https://consentra.com.br/wp-sitemap-posts-post-1.xml (sitemap de posts)
 - Vídeo de apresentação no YouTube (ID HI49lxjmuZg), canal @consentra
+- API pública do WordPress: https://consentra.com.br/wp-json/ (namespaces de plugins) e https://consentra.com.br/wp-json/trustindex/v1/get-widgets (vazio)
 - Facebook: https://www.facebook.com/profile.php?id=100063458924111 (bloqueado, 403)
 - Instagram: https://www.instagram.com/cons.entra/ (bloqueado, 403)
 
