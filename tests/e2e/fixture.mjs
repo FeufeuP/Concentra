@@ -4,6 +4,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 const base = 'https://consentra-sst-psi.vercel.app';
 const endpoint = 'https://bdpapewphroxsbrnqpst.supabase.co/functions/v1/persistence-test-fixture';
 const op = process.argv[2];
+const expectedSha = process.env.PERSISTENCE_TARGET_SHA || process.env.GITHUB_SHA;
 if (op === 'wait') {
   const deadline = Date.now() + 8 * 60_000;
   let ready = false;
@@ -11,12 +12,12 @@ if (op === 'wait') {
     try {
       const response = await fetch(`${base}/api/version`, { signal: AbortSignal.timeout(15000) });
       const version = await response.json();
-      if (response.ok && version.commit === process.env.GITHUB_SHA) { ready = true; break; }
+      if (response.ok && version.commit === expectedSha) { ready = true; break; }
     } catch { /* deployment is not ready yet */ }
     await new Promise(resolve => setTimeout(resolve, 10000));
   }
   if (!ready) throw new Error('The expected production commit was not published in time.');
-  console.log(`Production commit verified: ${process.env.GITHUB_SHA}`);
+  console.log(`Production commit verified: ${expectedSha}`);
 } else if (op === 'provision' || op === 'cleanup') {
   const tokenUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
   tokenUrl.searchParams.set('audience', 'consentra-persistence-validation');

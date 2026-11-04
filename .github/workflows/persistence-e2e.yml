@@ -3,6 +3,11 @@ name: Homologação de persistência
 on:
   push:
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Commit já publicado a validar (vazio = commit do workflow)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -15,6 +20,8 @@ jobs:
       github.ref == 'refs/heads/arena/86d03fa8-concentra' &&
       (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[persistence-e2e]'))
     runs-on: ubuntu-latest
+    env:
+      PERSISTENCE_TARGET_SHA: ${{ inputs.target_sha || github.sha }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -33,7 +40,7 @@ jobs:
       - name: Provisionar identidades temporárias por OIDC
         run: node tests/e2e/fixture.mjs provision
       - name: Validar login, gravação, logout e nova sessão
-        run: npx playwright test
+        run: npx playwright test --reporter=list,github
       - name: Remover somente fixtures deste run
         if: always()
         run: node tests/e2e/fixture.mjs cleanup
