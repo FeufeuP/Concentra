@@ -99,8 +99,9 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
     clone.id = 'a4-sheet-render-clone';
     clone.style.width = '794px';
     clone.style.maxWidth = '794px';
-    clone.style.minHeight = '1120px';
-    clone.style.maxHeight = '1122px';
+    clone.style.minHeight = '1122px';
+    clone.style.height = 'auto';
+    clone.style.maxHeight = 'none';
     clone.style.transform = 'none';
     clone.style.margin = '0';
     clone.style.padding = '36px 44px';
@@ -109,9 +110,9 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
     clone.style.borderRadius = '0';
     clone.style.border = 'none';
     clone.style.backgroundColor = '#ffffff';
-    clone.style.overflow = 'hidden';
-    clone.style.pageBreakAfter = 'avoid';
-    clone.style.pageBreakInside = 'avoid';
+    clone.style.overflow = 'visible';
+    clone.style.pageBreakAfter = 'auto';
+    clone.style.pageBreakInside = 'auto';
 
     // Converte imagens internas para Base64 para garantir carregamento instantâneo pelo html2canvas
     const images = clone.querySelectorAll('img');
@@ -157,7 +158,7 @@ async function getOrBuildA4Element(quote: Quote): Promise<{ element: HTMLElement
   const cleanNum = String(quote.numberOnly || quote.id).replace('#', '').trim();
 
   staging.innerHTML = `
-    <div id="a4-sheet-standalone" style="width: 794px; max-width: 794px; min-height: 1120px; max-height: 1122px; background-color: #ffffff; color: #0b1c30; padding: 36px 44px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: space-between; page-break-after: avoid; page-break-inside: avoid; break-after: avoid; break-inside: avoid; overflow: hidden;">
+    <div id="a4-sheet-standalone" style="width: 794px; max-width: 794px; min-height: 1122px; height: auto; background-color: #ffffff; color: #0b1c30; padding: 36px 44px; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; display: flex; flex-direction: column; justify-content: space-between; page-break-after: auto; page-break-inside: auto; break-after: auto; break-inside: auto; overflow: visible;">
       <div style="display: flex; flex-direction: column; gap: 14px;">
         <!-- Header: Logotipo e Dados Consentra -->
         <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 16px; border-bottom: 2px solid #145E5B; gap: 16px;">

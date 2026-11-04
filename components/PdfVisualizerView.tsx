@@ -288,7 +288,7 @@ export const PdfVisualizerView: React.FC<PdfVisualizerViewProps> = ({
           {/* Pristine A4 Document Sheet */}
           <div
             id="a4-sheet"
-            className="w-[210mm] max-w-[210mm] h-[297mm] max-h-[297mm] bg-white text-[#0b1c30] p-[12mm_14mm] shadow-2xl rounded-sm flex flex-col justify-between border border-gray-200 overflow-hidden box-border"
+            className="w-[210mm] max-w-[210mm] min-h-[297mm] bg-white text-[#0b1c30] p-[12mm_14mm] shadow-2xl rounded-sm flex flex-col justify-between border border-gray-200 overflow-visible box-border print-single-page"
           >
             <div className="flex flex-col gap-4">
               {/* Header: Logo and Consentra Corporate Info */}
