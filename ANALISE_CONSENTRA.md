@@ -25,7 +25,8 @@
 12. [Perguntas antes de contratar](#12-perguntas-antes-de-contratar)
 13. [Pendências](#13-pendências)
 14. [Estrutura e design do site](#14-estrutura-e-design-do-site)
-15. [Fontes](#15-fontes)
+15. [Análise visual (capturas mobile)](#15-análise-visual-capturas-de-tela-mobile)
+16. [Fontes](#16-fontes)
 
 ---
 
@@ -36,7 +37,7 @@
 - O site **não exibe nomes nem registros profissionais** (CREA ou equivalente) de quem assina os laudos.
 - A empresa **não declara exames ocupacionais nem clínica própria**, diferentemente de três concorrentes locais.
 - O blog tem **29 artigos** de conteúdo educativo, com boa parte duplicada e sem fontes citadas. Não há publicações desde abril de 2026.
-- **Reputação:** não há avaliações públicas independentes verificáveis (nem positivas, nem negativas) nas fontes consultadas. O Google Avaliações não foi acessado.
+- **Reputação:** há avaliações públicas no Google (nota 4,9 no mapa e cartões de cinco estrelas no site), mas o conjunto completo não foi analisado. Reclame Aqui, Indeed e buscas judiciais não mostraram nada relevante.
 - **Veredito:** a empresa parece legítima, mas não há prova pública independente de qualidade. Recomenda-se checar responsáveis técnicos, CNPJ emissor e referências antes de contratar.
 
 ---
@@ -301,12 +302,12 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 |---|---|
 | **Reclame Aqui** | Endereço testado retornou 404. A busca não encontrou perfil da Consentra. |
 | **Indeed (avaliações de funcionários)** | Página existe, mas diz: "No momento não há avaliações da empresa". Zero avaliações. |
-| **Google (avaliações de clientes)** | **Não acessado.** Vale verificar manualmente, buscando "Consentra Araucária" pelo celular. |
+| **Google (avaliações de clientes)** | Widget do site mostra avaliações de cinco estrelas, com ícone do Google. O mapa mostra nota 4,9. Número total e reclamações não foram analisados. |
 | **Facebook e Instagram** | Bloqueados para consulta (erro 403). Não analisados. |
 | **Buscas judiciais públicas** | Nenhuma ação encontrada nas buscas. Limitação: busca genérica, sem consulta direta a tribunais. |
 | **Depoimentos no próprio site** | 8, todos sobre treinamentos. Sem data, sobrenome completo ou empresa. |
 
-**Conclusão:** não há reputação pública independente verificável, nem positiva nem negativa. Buscas genéricas por "Consentra" também retornam empresas homônimas (Asteca, New Age, Conssetra), que foram descartadas da análise.
+**Conclusão:** há avaliações públicas no Google com nota alta, mas não há análise do conjunto completo nem das reclamações nas fontes consultadas. Buscas genéricas por "Consentra" também retornam empresas homônimas (Asteca, New Age, Conssetra), que foram descartadas da análise.
 
 ---
 
@@ -337,7 +338,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 
 **Porém, não há prova pública independente de qualidade.** Os principais pontos de atenção são:
 - nenhum responsável técnico nomeado nem registro profissional exibido no site;
-- ausência de avaliações independentes encontráveis;
+- avaliações no Google visíveis (nota 4,9), mas sem análise do conjunto completo;
 - dois CNPJs parecidos no mesmo município, a confirmar;
 - marco histórico inconsistente ("16 anos", "desde 2008" e CNPJ de 2017);
 - blog possivelmente parado desde abril de 2026;
@@ -360,7 +361,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 
 ## 13. Pendências
 
-- [ ] Verificar as avaliações no **Google** (buscar "Consentra Araucária" pelo celular).
+- [ ] Analisar o conjunto completo de avaliações no **Google** (total, notas baixas e respostas da empresa).
 - [ ] Confirmar o CNPJ **15.499.834/0001-60** na Receita Federal e a relação com o CNPJ principal.
 - [ ] Confirmar a data de fundação ("2008" ou "2017") com documentos da empresa.
 - [ ] Analisar as imagens do vídeo de apresentação (aparência, logos, textos na tela), se houver uma cópia do arquivo ou capturas de tela. A transcrição e a descrição já foram analisadas na seção 6.
@@ -424,7 +425,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 
 ### 14.6 Blocos repetidos e prova social
 - Entre a home e a página Quem somos se repetem: os três cards de diferencial, a grade de clientes, os oito depoimentos e os canais de contato.
-- Os depoimentos seguem o formato "Publicado em / nome / texto", **sem data visível**. Esse formato é típico de widgets de avaliações. Não é possível dizer se vêm do Google ou se foram digitados no site. Vale verificar a origem, porque o plugin Trustindex está instalado.
+- Os depoimentos são **avaliações do Google**: as capturas mobile mostram o ícone do Google, a nota de cinco estrelas e o nome do autor. A hipótese levantada antes está resolvida. A home mostra só uma amostra; o conjunto completo não foi analisado.
 
 ### 14.7 Blog
 - **Listagem:** 8 posts por página, com paginação em `/blog/page/2/`.
@@ -483,7 +484,85 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 
 ---
 
-## 15. Fontes
+## 15. Análise visual (capturas de tela mobile)
+
+> Base: 5 capturas de tela da página em celular (Chrome Android, 04/11/2026), que cobrem o topo até o rodapé sem lacunas. As imagens originais chegaram truncadas e foram convertidas para leitura. **Animações e movimentos não podem ser confirmados em imagem estática**: a seção 15.3 separa o que é visível do que é apenas provável.
+
+### 15.1 Paleta, tipografia e identidade
+- **Cor principal:** verde-azulado (teal), usado em faixas de destaque, botões, cards de contato, cards de diferencial e no logotipo. O fundo é predominantemente branco, com texto em cinza escuro.
+- **Tipografia:** sans-serif. Títulos grandes e em negrito (ex.: "Proteja sua equipe com soluções completas..."), textos de apoio em peso leve. Títulos de seção em teal, com um rótulo pequeno acima (eyebrow).
+- **Logotipo:** "CONSENTRA" em teal, com o subtítulo "Segurança do Trabalho", em versão horizontal no cabeçalho e em versão ampliada no banner de contato.
+- **Ícones:** de linha fina, em teal (indicadores e contatos). Os cartões de avaliação têm o ícone do Google.
+- **Imagens:** fotos de equipe e obra (trabalhadores com coletes vermelhos em frente a um galpão; treinamento com fumaça; obra com capacete amarelo). Há também uma foto de banco de imagens (homem com capacete falando ao telefone, no banner) e a foto do presidente no vídeo.
+
+### 15.2 Sequência e layout (mobile, de cima para baixo)
+1. **Cabeçalho:** logotipo à esquerda e ícone de menu hambúrguer à direita (menu recolhido).
+2. **Hero:** foto de fundo (mãos, capacete amarelo, prancheta) com uma faixa vertical teal à esquerda, contendo o rótulo "Segurança e Saúde do Trabalho" e o título "SOMOS A CONSENTRA". Botão teal "Fale conosco (41) 99694-3025", com ícone de telefone.
+3. **Indicadores:** painel branco sobreposto ao hero, com três estatísticas (5000+, 700+ e 3000+) e ícones de linha.
+4. **Foto de equipe** em frente a um galpão.
+5. **Selo "16+ Anos de Experiência"** em caixa teal, ao lado de uma foto de treinamento.
+6. **Apresentação:** rótulo "Protegendo o que mais importa", título grande, dois parágrafos, lista de seis itens com marcadores de check em duas colunas e botão "SAIBA MAIS!".
+7. **Diferencial:** bloco teal "Nosso Diferencial" com seta, seguido de três cards teal numerados (01, 02, 03), lado a lado.
+8. **Nossos serviços:** seis cards em três colunas (duas linhas), cada um com foto, título, texto e botão "Saiba Mais".
+9. **Clientes:** carrossel com logotipos e indicadores de paginação (pontinhos).
+10. **Depoimentos:** cartões cinza-claros com foto, nome, nota de cinco estrelas, ícone do Google e texto, em faixa horizontal.
+11. **Vídeo:** "Bem-Vindo(a) A CONSENTRA!", com miniatura do presidente e botão de play teal.
+12. **Canais de contato:** quatro cartões alternados (branco e teal), com ícone e texto: Endereço, Telefone, E-mail Comercial e E-mail Dúvidas.
+13. **Mapa:** Google Maps com pino em Araucária e cartão do negócio com nota 4,9.
+14. **Banner:** "Especialista em saúde e segurança do trabalho.", com o logotipo grande, botão "Solicite um orçamento!", telefone (41) 98485-9144 e foto de banco de imagens.
+15. **Formulário "Entre em contato":** campos Nome, Telefone, Serviço de interesse (lista com "Treinamentos" selecionado por padrão), Mensagem, forma de contato preferida (botões de rádio: Telefone, WhatsApp, E-mail) e botão "Enviar".
+16. **Rodapé:** "© Copyright 2024 - CONSENTRA SEGURANÇA DO TRABALHO LTDA."
+
+**Elemento fixo:** botão verde do WhatsApp no canto inferior direito, presente em todas as capturas, na mesma posição.
+
+### 15.3 Movimento e animações
+**Observado (pela imagem):**
+- **Botão do WhatsApp fixo** durante toda a rolagem.
+- **Carrossel de clientes** com cerca de 20 indicadores de paginação. Mostra três logotipos por vez, o que sugere rotação automática ou deslize.
+- **Carrossel horizontal de depoimentos:** o último cartão aparece cortado na borda, indicando rolagem horizontal.
+- **Vídeo em pop-up:** a miniatura tem botão de play. A reprodução abre em janela própria.
+- **Mapa interativo:** a aviso "Utilize dois dedos para mover o mapa" aparece na tela.
+- **Menu hambúrguer:** o menu fica recolhido no celular.
+
+**Provável, mas não confirmado (exige vídeo ou inspeção do código):**
+- Entrada das seções com efeito de surgimento ao rolar (fade ou slide), comum em temas Elementor.
+- Contadores animados nos indicadores 5000+, 700+ e 3000+.
+- Efeito de hover em cards e botões, como "Saiba Mais".
+- Abertura de acordeões na página de serviços (confirmada na estrutura, mas não visível nas capturas).
+
+**Para confirmar:** gravar um vídeo curto rolando a página no celular e no computador.
+
+### 15.4 Pontos fortes do design
+- **Hierarquia visual clara:** rótulo, título, texto e botão, repetidos em quase todas as seções.
+- **Paleta consistente:** uma cor principal, o que dá identidade e reconhecimento ao site.
+- **Fotos reais de equipe e obra:** transmitem autenticidade para um setor que depende de confiança.
+- **Blocos alternados** (teal e branco), que separam bem as seções.
+- **Botões grandes e de contraste**, fáceis de tocar no celular.
+- **Vários canais de contato visíveis**, formulário completo e mapa com localização.
+
+### 15.5 Problemas de design e de responsividade (celular)
+1. **Texto pequeno em colunas estreitas:** a seção de serviços mantém três colunas no celular. Os textos ficam pequenos e os títulos quebram em duas linhas ("Laudos / Técnicos", "Gestão em / SST").
+2. **Cards de diferencial apertados:** quatro cards lado a lado, com pouco espaço e linhas de duas a três palavras. A leitura fica difícil, sobretudo nos cards 02 e 03.
+3. **E-mails cortados:** nos cartões de contato, "comercial@consentra.c..." e "contato@consentra.co..." aparecem truncados.
+4. **Formulário só com placeholders:** Nome, Telefone e Mensagem têm apenas o texto de exemplo, sem rótulo visível. Ao digitar, a referência ao campo desaparece. Os botões de rádio têm aparência padrão do navegador, fora do estilo do restante da página.
+5. **Banner com estilo diferente:** o banner de contato usa foto de banco de imagens e logotipo sobre fundo branco, enquanto as demais seções usam teal.
+6. **Copyright desatualizado:** "© Copyright 2024", em novembro de 2026.
+7. **Carrossel de clientes:** cerca de 20 indicadores de paginação, com logotipos de tamanhos e recortes diferentes. O logotipo da UFPR aparece com fundo próprio.
+8. **Texto sobre o hero:** o parágrafo "Oferecemos TODOS os serviços..." é pequeno e fica sobre uma foto escura, o que reduz o contraste (avaliação visual).
+9. **Dois telefones diferentes na mesma tela:** (41) 99694-3025 no hero e (41) 98485-9144 no banner e nos canais de contato.
+
+### 15.6 Acessibilidade visual (estimativa)
+- Texto branco sobre teal e teal sobre branco costumam atingir contraste suficiente para textos grandes. Textos pequenos, como os de cards e legendas, podem ficar abaixo do recomendado. Não foi feita medição de contraste.
+- Textos pequenos e em caixa alta, como os títulos dos cards, são mais difíceis de ler em telas pequenas.
+
+### 15.7 Correções às análises anteriores
+- **Reputação:** o site exibe avaliações do Google (ícone do Google, cinco estrelas, nome do autor), e o mapa mostra nota 4,9. Isso corrige a análise anterior, que dizia não haver avaliações públicas. Elas existem. O que não foi possível fazer é ver o conjunto completo de avaliações, incluindo as críticas.
+- **Depoimentos:** são avaliações do Google, não depoimentos digitados no site. A hipótese da seção 14.6 está resolvida.
+- **Copyright:** o rodapé indica 2024, um dado a mais para a seção 8.
+
+---
+
+## 16. Fontes
 
 **Site e canais da Consentra**
 - https://consentra.com.br/ (página inicial)
@@ -492,6 +571,7 @@ Pelo sitemap, os 29 artigos têm data de última modificação entre 17/12/2025 
 - https://consentra.com.br/blog
 - https://consentra.com.br/wp-sitemap-posts-post-1.xml (sitemap de posts)
 - Vídeo de apresentação no YouTube (ID HI49lxjmuZg), canal @consentra
+- Capturas de tela da página em celular enviadas pelo usuário (Chrome Android, 04/11/2026)
 - API pública do WordPress: https://consentra.com.br/wp-json/ (namespaces de plugins) e https://consentra.com.br/wp-json/trustindex/v1/get-widgets (vazio)
 - Facebook: https://www.facebook.com/profile.php?id=100063458924111 (bloqueado, 403)
 - Instagram: https://www.instagram.com/cons.entra/ (bloqueado, 403)
