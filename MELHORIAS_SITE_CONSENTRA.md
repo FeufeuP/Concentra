@@ -5,6 +5,8 @@
 > **O que é:** uma análise do site institucional atual da **Consentra Soluções em Segurança do Trabalho** (consentra.com.br), feita em **04/11/2026**, seguida de melhorias.
 > **Para que serve:** as melhorias listadas servem de exemplo e de base para criar **um novo site, melhor e melhorado**, em outro chat ou projeto. A seção 9 traz um briefing pronto para colar nesse novo chat.
 > **O que não é:** não é um projeto de software, não altera o site atual e não é uma auditoria jurídica ou técnica da empresa.
+>
+> **Uso do site como inspiração:** o site consentra.com.br é usado apenas como referência de estrutura, organização de conteúdo e design. Nenhum texto, imagem, nome, telefone, CNPJ ou dado da Consentra deve ser reutilizado no novo site. Todos os dados do novo site devem vir da nova empresa ou ser deixados como campos a preencher.
 
 ---
 
@@ -332,8 +334,8 @@
 ## 7. Plano de criação sugerido
 
 **Fase 1: fundamentos (semana 1)**
-- Definir o número oficial de WhatsApp, a data de fundação e o destino do formulário.
-- Confirmar nomes, formação e registros da equipe técnica.
+- Definir os dados da nova empresa: nome, ramo, endereço, telefone e WhatsApp, e-mail de contato e destino do formulário.
+- Definir a equipe técnica da nova empresa, com nome, formação e registros, ou deixar campos a preencher.
 - Definir a arquitetura de páginas e os componentes do design.
 - Redigir a política de privacidade.
 
@@ -365,7 +367,8 @@ Use esta lista para avaliar o novo site antes de publicá-lo.
 
 **Confiança e conteúdo**
 - [ ] Um único número de WhatsApp em todo o site.
-- [ ] Data de fundação fixa e confirmada.
+- [ ] Data de fundação fixa, com dado verificado da nova empresa.
+- [ ] Nenhum dado, texto ou imagem da Consentra reutilizado.
 - [ ] Equipe técnica com nome, formação e registro.
 - [ ] Todo número de impacto tem data e fonte.
 - [ ] Toda norma citada tem número e item.
@@ -409,7 +412,7 @@ Use esta lista para avaliar o novo site antes de publicá-lo.
 
 Copie o texto abaixo para iniciar a criação do novo site em outro chat:
 
-> Quero criar um site institucional novo e melhor para a **Consentra Soluções em Segurança do Trabalho**, empresa de SST em Araucária (PR), região metropolitana de Curitiba. Serviços: laudos técnicos (LTCAT, periculosidade, insalubridade e conformidade de pontos de ancoragem), gestão de SST (PGR, PPR, APR, PCMSO, GRO e eSocial S-2210, S-2220 e S-2240), treinamentos de NRs, locação de equipamentos (dosímetro, linha de vida) e projetos de engenharia (pontos de ancoragem, adequação de máquinas NR-12, incêndio e sinalização). O site atual tem problemas: duas datas de fundação diferentes (2008 e 2017 no CNPJ), dois telefones, equipe sem nomes ou registros, formulário sem rótulos, sem política de privacidade, textos pequenos e e-mails cortados no celular, blog com artigos repetidos e sem fontes. Quero um site com: páginas próprias por serviço; equipe técnica identificada; avaliações do Google com link; formulário com LGPD; blog em pilares com citação de normas; layout que funcione bem no celular; acessibilidade WCAG AA; desempenho bom em Core Web Vitals. Use a seção 5 e a seção 8 deste documento como requisitos e checklist de aceitação. Pergunte antes de criar qualquer texto com nomes, registros ou números que eu ainda não tenha confirmado.
+> Quero criar um site institucional novo e melhor para [NOME DA NOVA EMPRESA], empresa de [RAMO DE ATUAÇÃO] em [CIDADE/REGIÃO]. Uso o site consentra.com.br apenas como inspiração de estrutura, organização de conteúdo e design, sem copiar textos, imagens, nomes, telefones ou dados dele. Serviços da nova empresa: [LISTE OS SERVIÇOS]. Contatos: [TELEFONE/WHATSAPP], [E-MAIL], [ENDEREÇO]. Equipe: [NOMES, FORMAÇÃO E REGISTROS, OU A DEFINIR]. Quero um site com: páginas próprias por serviço; equipe técnica identificada; avaliações com link para o perfil de avaliações; formulário com rótulos visíveis e conformidade com a LGPD; blog organizado em temas, com citação de normas quando houver; layout que funcione bem no celular; acessibilidade WCAG AA; desempenho bom em Core Web Vitals. Use a seção 5 e a seção 8 deste documento como requisitos e checklist de aceitação. Pergunte antes de criar qualquer texto com nomes, registros, números ou datas que eu ainda não tenha informado.
 
 ---
 
@@ -426,16 +429,17 @@ Copie o texto abaixo para iniciar a criação do novo site em outro chat:
 - **Conteúdo do blog:** foram lidos os textos principais. Não foi feita revisão técnica completa de cada artigo.
 - **Concorrentes:** a amostra é pequena e baseada em presença online encontrada em buscas.
 
-### 10.2 Itens a confirmar com a empresa
-- Data de fundação oficial: 2008 ou 2017?
-- Qual número de WhatsApp é o oficial?
-- Para onde o formulário envia as mensagens?
-- Os exames ocupacionais são feitos diretamente ou por clínica parceira?
-- Nomes, formação e registros da equipe técnica.
-- Os números de 5000+ vidas treinadas, 700+ projetos e 3000+ clientes podem ser comprovados?
-- Qual é a relação entre o CNPJ 15.499.834/0001-60 e a empresa principal?
-- A empresa tem política de privacidade publicada em outro endereço?
+### 10.2 Itens a definir para o novo site
+- Nome, ramo, endereço, telefones, WhatsApp e e-mail da nova empresa.
+- Data de fundação da nova empresa, com documento que a comprove.
+- Destino das mensagens do formulário e prazo de resposta.
+- Se os exames ou outros serviços terceirizados serão oferecidos por parceiros, e quais.
+- Nomes, formação e registros da equipe técnica, ou campos a preencher.
+- Números de impacto da nova empresa, somente se puderem ser comprovados.
+- Política de privacidade e termos de uso da nova empresa.
 - Autorização para usar nomes de clientes e fotos de projetos em casos de estudo.
+
+Os dados da Consentra citados neste documento servem apenas para análise. Eles não devem ser usados como conteúdo do novo site.
 
 ---
 
