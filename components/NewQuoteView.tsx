@@ -1310,11 +1310,12 @@ export const NewQuoteView: React.FC<NewQuoteViewProps> = ({
         isOpen={showAdminModal}
         onClose={() => setShowAdminModal(false)}
         quote={quote}
-        onApplyToQuote={async (updatedQuote) => {
-          const saved = await onSaveQuote(updatedQuote);
-          if (!saved) return false;
-          setQuote(saved);
-          return true;
+        onApplyToQuote={(updatedQuote) => {
+          setQuote(updatedQuote);
+          if (onSaveQuote) {
+            onSaveQuote(updatedQuote);
+          }
+          showToast('Textos e cabeçalho da proposta configurados pelo Administrador com sucesso!');
         }}
         initialTab={adminModalTab}
       />

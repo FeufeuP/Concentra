@@ -41,20 +41,16 @@ export const LogoSection: React.FC<LogoSectionProps> = ({ remoteMode, ensureCanE
     }
 
     if (remoteMode) {
-      if (isUploadingLogo) return;
       setIsUploadingLogo(true);
-      setLogoUploadMsg(null);
-      try {
-        const res = await uploadLogoToStorage(file);
-        if (!res.success) throw new Error(res.error);
-        if (!await saveStoredLogoUrl(res.data)) throw new Error('Não foi possível atualizar o cache do navegador.');
-        setActiveLogo(res.data);
-        flashLogoMsg('Logotipo confirmado no servidor! Aplicado em todos os orçamentos e Ordens de Serviço.');
-      } catch (err) {
-        showToast(`Logotipo não salvo: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
-      } finally {
-        setIsUploadingLogo(false);
+      const res = await uploadLogoToStorage(file);
+      setIsUploadingLogo(false);
+      if (!res.success) {
+        showToast(`Logotipo não enviado: ${res.error}`, 'error');
+        return;
       }
+      saveStoredLogoUrl(res.data);
+      setActiveLogo(res.data);
+      flashLogoMsg('Logotipo enviado ao servidor! Aplicado em todos os orçamentos e Ordens de Serviço.');
       return;
     }
 
@@ -64,10 +60,10 @@ export const LogoSection: React.FC<LogoSectionProps> = ({ remoteMode, ensureCanE
       return;
     }
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const dataUrl = event.target?.result as string;
       if (!dataUrl) return;
-      if (!await saveStoredLogoUrl(dataUrl)) {
+      if (!saveStoredLogoUrl(dataUrl)) {
         showToast('Não foi possível salvar o logotipo: armazenamento do navegador cheio.', 'error');
         return;
       }
@@ -77,19 +73,11 @@ export const LogoSection: React.FC<LogoSectionProps> = ({ remoteMode, ensureCanE
     reader.readAsDataURL(file);
   };
 
-  const handleResetLogo = async () => {
-    if (!ensureCanEdit() || isUploadingLogo) return;
-    setIsUploadingLogo(true);
-    setLogoUploadMsg(null);
-    try {
-      await clearStoredLogoUrl();
-      setActiveLogo(DEFAULT_LOGO_URL);
-      flashLogoMsg('Logotipo restaurado para a versão oficial real padrão.');
-    } catch (err) {
-      showToast(`Logotipo não restaurado: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error');
-    } finally {
-      setIsUploadingLogo(false);
-    }
+  const handleResetLogo = () => {
+    if (!ensureCanEdit()) return;
+    clearStoredLogoUrl();
+    setActiveLogo(DEFAULT_LOGO_URL);
+    flashLogoMsg('Logotipo restaurado para a versão oficial real padrão.');
   };
 
   useEffect(() => {
@@ -167,7 +155,7 @@ export const LogoSection: React.FC<LogoSectionProps> = ({ remoteMode, ensureCanE
                 </span>
               </div>
               <p className="text-[11px] text-[#49607e] mt-0.5">
-                Exibido com proporção original (1.71:1) de alta definição, sem estiramento ou distorções.
+                Exibido sempre na proporção original da imagem, sem estiramento ou distorções.
               </p>
             </div>
           </div>

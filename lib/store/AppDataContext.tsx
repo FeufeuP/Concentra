@@ -24,6 +24,7 @@ import { DEFAULT_EMPTY_QUOTE } from '../mock-data';
 import { AuthUser, canWrite as userCanWrite, isAdminUser } from '../auth';
 import { createRepository, DataRepository, nextProvisionalNumber, QUOTE_NUMBER_BASE } from '../repository';
 import { getStoredResponsibles, PRIMARY_RESPONSIBLE } from '../responsibles';
+import { pullRemoteSettings } from '../settings-sync';
 import { SETTINGS_SYNC_ERROR_EVENT, SettingsSyncErrorDetail } from '../remote-sync';
 import { getPendingLocalData } from '../local-import';
 import { getTodayFormatted, calculateValidityDate } from '../masks';
@@ -150,9 +151,7 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
     const onSyncError = (e: Event) => {
       const detail = (e as CustomEvent<SettingsSyncErrorDetail>).detail;
       showToast(`Configuração não salva no servidor: ${detail?.error || 'erro desconhecido'}`, 'error');
-      // O cache só muda após confirmação. Recarregar aqui apagaria o rascunho
-      // ainda aberto no formulário, justamente quando a gravação falhou.
-      requestConnectionRecheck();
+      void pullRemoteSettings();
     };
     const onResponsibles = (e: Event) => {
       const detail = (e as CustomEvent<string[]>).detail;
@@ -353,7 +352,7 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const addClient = useCallback(
     async (client: ClientData): Promise<boolean> => {
       if (!ensureCanWrite()) return false;
-      const res = await repo.saveClient(client, true);
+      const res = await repo.saveClient(client);
       if (!res.success) {
         handleFailure(`Cliente "${client.name}" não foi cadastrado`, res.error);
         return false;
@@ -368,7 +367,7 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const editClient = useCallback(
     async (client: ClientData): Promise<boolean> => {
       if (!ensureCanWrite()) return false;
-      const res = await repo.saveClient(client, false);
+      const res = await repo.saveClient(client);
       if (!res.success) {
         handleFailure(`Dados do cliente "${client.name}" não foram salvos`, res.error);
         return false;
@@ -398,13 +397,21 @@ export function AppDataProvider({ user, children, repository }: AppDataProviderP
   const saveService = useCallback(
     async (service: CatalogService, isNew: boolean): Promise<boolean> => {
       if (!ensureCanWrite()) return false;
-      const res = await repo.saveService(service);
+      // Carimbo local: a ordenação "Mais Recentes" coloca o serviço salvo no
+      // topo imediatamente (no modo Supabase o banco devolve as datas no reload).
+      const now = new Date().toISOString();
+      const stamped: CatalogService = {
+        ...service,
+        createdAt: service.createdAt || (isNew ? now : undefined),
+        updatedAt: now,
+      };
+      const res = await repo.saveService(stamped);
       if (!res.success) {
         handleFailure(`Serviço "${service.title}" não foi salvo`, res.error);
         return false;
       }
       setCatalog((prev) =>
-        isNew ? [service, ...prev.filter((s) => s.id !== service.id)] : prev.map((s) => (s.id === service.id ? service : s))
+        isNew ? [stamped, ...prev.filter((s) => s.id !== stamped.id)] : prev.map((s) => (s.id === stamped.id ? stamped : s))
       );
       return true;
     },

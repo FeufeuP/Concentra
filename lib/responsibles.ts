@@ -1,5 +1,4 @@
 import { pushSetting, SETTING_KEYS } from './remote-sync';
-import { isSupabaseConfigured } from './supabase';
 
 /** Lista padrão de responsáveis pelo orçamento (fonte única; o SQL usa os mesmos nomes). */
 export const DEFAULT_RESPONSIBLES: string[] = [
@@ -67,18 +66,17 @@ export function getStoredResponsibles(): string[] {
   return DEFAULT_RESPONSIBLES;
 }
 
-export async function saveStoredResponsibles(list: string[]): Promise<void> {
+export function saveStoredResponsibles(list: string[]): void {
   if (typeof window === 'undefined') return;
   const filtered = sanitizeResponsibles(list);
-  await pushSetting(SETTING_KEYS.responsibles, filtered);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     // Evento para atualização reativa entre componentes
     window.dispatchEvent(new CustomEvent('consentra_responsibles_updated', { detail: filtered }));
   } catch (err) {
-    if (!isSupabaseConfigured()) throw err;
-    console.error('Erro ao atualizar cache dos responsáveis:', err);
+    console.error('Erro ao salvar responsáveis no localStorage:', err);
   }
+  pushSetting(SETTING_KEYS.responsibles, filtered);
 }
 
 /** Aplica a lista vinda do servidor (substitui o cache local, sem reenviar). */
@@ -97,21 +95,21 @@ export function applyRemoteResponsibles(value: unknown): void {
   }
 }
 
-export async function addStoredResponsible(name: string): Promise<string[]> {
+export function addStoredResponsible(name: string): string[] {
   const trimmed = name.trim();
   if (!isAllowedResponsible(trimmed)) return getStoredResponsibles();
   const current = getStoredResponsibles();
   if (!current.includes(trimmed)) {
     const updated = [...current, trimmed];
-    await saveStoredResponsibles(updated);
+    saveStoredResponsibles(updated);
     return updated;
   }
   return current;
 }
 
-export async function removeStoredResponsible(name: string): Promise<string[]> {
+export function removeStoredResponsible(name: string): string[] {
   const current = getStoredResponsibles();
   const updated = current.filter(n => n !== name);
-  await saveStoredResponsibles(updated);
+  saveStoredResponsibles(updated);
   return updated;
 }

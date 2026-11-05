@@ -34,7 +34,7 @@ export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmi
       setPending(getPendingLocalData());
       if (res.errors.length === 0) {
         showToast(
-          `Importação ${getPendingLocalData() ? "parcial" : "concluída"}: ${res.quotesImported} orçamento(s) e ${res.clientsImported} cliente(s) enviados ao servidor.${getPendingLocalData() ? " Configurações pendentes aguardam um administrador." : ""}`
+          `Importação concluída: ${res.quotesImported} orçamento(s) e ${res.clientsImported} cliente(s) enviados ao servidor.`
         );
       } else {
         showToast(`Importação com ${res.errors.length} erro(s). Veja os detalhes em Configurações.`, 'error');
@@ -80,7 +80,7 @@ export const LocalDataImportCard: React.FC<LocalDataImportCardProps> = ({ isAdmi
             </p>
           )}
           <p className="text-[11px] text-[#64748b] mt-1">
-            Novos orçamentos importados recebem um número reservado pelo servidor. É seguro repetir a importação: itens já enviados são ignorados.
+            Orçamentos cujo número já exista no servidor recebem um novo número. É seguro repetir a importação: itens já enviados são ignorados.
           </p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useDialog } from './ui/DialogProvider';
 import { useToast } from './ui/ToastProvider';
 import { Quote } from '@/lib/types';
@@ -19,7 +19,7 @@ interface AdminQuoteConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   quote?: Quote;
-  onApplyToQuote?: (updatedQuote: Quote) => Promise<boolean>;
+  onApplyToQuote?: (updatedQuote: Quote) => void;
   initialTab?: 'header' | 'texts';
 }
 
@@ -32,16 +32,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
   const { confirm } = useDialog();
   const showToast = useToast();
   const [activeTab, setActiveTab] = useState<'header' | 'texts'>(initialTab);
-  const [isSaving, setIsSaving] = useState(false);
-  const busy = useRef(false);
-  const runSave = async (action: () => Promise<void>) => {
-    if (busy.current) return;
-    busy.current = true;
-    setIsSaving(true);
-    try { await action(); }
-    catch (err) { showToast(`Não foi possível salvar: ${err instanceof Error ? err.message : 'tente novamente.'}`, 'error'); }
-    finally { busy.current = false; setIsSaving(false); }
-  };
 
   // Perfil da Empresa / Cabeçalho
   const [headerData, setHeaderData] = useState<CompanyProfile>(() => {
@@ -65,9 +55,10 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
   const [scopeSummary, setScopeSummary] = useState<string>(quote?.scopeSummary || '');
   const [observations, setObservations] = useState<string>(quote?.observations || '');
 
-  const applyToCurrentQuote = async () => {
+  const handleApplyToCurrentQuote = () => {
     if (!quote || !onApplyToQuote) {
       // Se não houver quote específico, salva globalmente
+      handleSaveAsGlobalDefault();
       return;
     }
 
@@ -114,23 +105,21 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
       }
     };
 
-    if (await onApplyToQuote(updatedQuote)) {
-      showToast('Configurações confirmadas no orçamento com sucesso!');
-      onClose();
-    }
+    onApplyToQuote(updatedQuote);
+    showToast('Configurações aplicadas ao orçamento com sucesso!');
+    onClose();
   };
 
-  const handleSaveAsGlobalDefault = () => runSave(async () => {
-    await Promise.all([saveStoredCompanyProfile(headerData), saveStoredQuoteTexts(textsData)]);
-    if (quote && onApplyToQuote) await applyToCurrentQuote();
-    else {
-      showToast('Configurações confirmadas como padrão oficial da empresa!');
+  const handleSaveAsGlobalDefault = () => {
+    saveStoredCompanyProfile(headerData);
+    saveStoredQuoteTexts(textsData);
+
+    if (quote && onApplyToQuote) {
+      handleApplyToCurrentQuote();
+    } else {
+      showToast('Configurações salvas como padrão oficial da empresa!');
       onClose();
     }
-  });
-  const handleApplyToCurrentQuote = () => {
-    if (!quote || !onApplyToQuote) return handleSaveAsGlobalDefault();
-    return runSave(applyToCurrentQuote);
   };
 
   const handleResetDefaults = async () => {
@@ -140,12 +129,11 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
       confirmLabel: 'Restaurar',
     });
     if (ok) {
-      await runSave(async () => {
-        const [resetHeader, resetTexts] = await Promise.all([resetStoredCompanyProfile(), resetStoredQuoteTexts()]);
-        setHeaderData(resetHeader);
-        setTextsData(resetTexts);
-        showToast('Padrões restaurados com sucesso.');
-      });
+      const resetHeader = resetStoredCompanyProfile();
+      const resetTexts = resetStoredQuoteTexts();
+      setHeaderData(resetHeader);
+      setTextsData(resetTexts);
+      showToast('Padrões restaurados com sucesso.');
     }
   };
 
@@ -173,7 +161,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
 
           <button
             type="button"
-            disabled={isSaving}
             onClick={onClose}
             className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
             title="Fechar"
@@ -186,7 +173,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
         <div className="flex border-b border-[#e2e8f0] bg-[#f8fafc] px-6 pt-3 gap-2 shrink-0">
           <button
             type="button"
-            disabled={isSaving}
             onClick={() => setActiveTab('header')}
             className={`pb-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all ${
               activeTab === 'header'
@@ -200,7 +186,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
 
           <button
             type="button"
-            disabled={isSaving}
             onClick={() => setActiveTab('texts')}
             className={`pb-3 px-4 text-xs font-bold flex items-center gap-2 border-b-2 transition-all ${
               activeTab === 'texts'
@@ -611,7 +596,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
         <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <button
             type="button"
-            disabled={isSaving}
             onClick={handleResetDefaults}
             className="text-xs text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1.5 transition-colors"
           >
@@ -622,7 +606,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
             <button
               type="button"
-            disabled={isSaving}
               onClick={onClose}
               className="px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
             >
@@ -631,7 +614,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
 
             <button
               type="button"
-            disabled={isSaving}
               onClick={handleSaveAsGlobalDefault}
               className="px-4 py-2.5 rounded-xl bg-white border-2 border-[#004328] text-[#004328] hover:bg-emerald-50 text-xs font-bold transition-colors"
               title="Salva como padrão da empresa para todos os orçamentos futuros"
@@ -642,7 +624,6 @@ const AdminQuoteConfigModalContent: React.FC<Omit<AdminQuoteConfigModalProps, 'i
             {quote && (
               <button
                 type="button"
-            disabled={isSaving}
                 onClick={handleApplyToCurrentQuote}
                 className="px-5 py-2.5 rounded-xl bg-[#004328] hover:bg-[#005c3e] text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-98"
               >

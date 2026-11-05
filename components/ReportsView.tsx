@@ -212,7 +212,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onD
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-16">
+    <div className="max-w-7xl mx-auto pb-16 print:pb-0">
+     <div className="flex flex-col gap-6 print:hidden">
       {/* Top Banner & Title */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-[#e5eeff]">
         <div>
@@ -610,8 +611,12 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onD
         )}
       </div>
 
-      {/* Printable official layout - rendered for standard browser print dialog */}
-      <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black">
+     </div>{/* /conteúdo de tela (não imprime) */}
+
+      {/* Layout oficial de impressão — SOMENTE ele sai no papel.
+          Em fluxo normal (não `fixed`, que cortava relatórios com mais de uma
+          página e repetia por cima do conteúdo de tela). */}
+      <div className="hidden print:block bg-white text-black">
         <div className="border-b-2 border-[#004328] pb-4 mb-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -691,7 +696,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ quotes, onOpenPdf, onD
 
       {/* Confirmation Modal for Quote/Report Deletion */}
       {quoteToDelete && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs print:hidden">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-[#ffdad6] shadow-2xl flex flex-col gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center shrink-0">

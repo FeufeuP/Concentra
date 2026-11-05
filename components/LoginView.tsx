@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrandLogo } from './ui/BrandLogo';
 import { AuthUser, loginUser, requestPasswordReset, isRemoteAuth } from '@/lib/auth';
-import { getStoredLogoUrl } from '@/lib/logo';
+import { getStoredLogoUrl, fetchPublicLogoUrl } from '@/lib/logo';
 
 interface LoginViewProps {
   onLoginSuccess: (user: AuthUser) => void;
@@ -25,6 +25,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, initialErr
       setLogoUrl(e.detail || getStoredLogoUrl());
     };
     window.addEventListener('consentra_logo_updated', handleLogoUpdated as EventListener);
+    // Navegador novo (cache vazio): busca o logotipo oficial do servidor
+    void fetchPublicLogoUrl();
     return () => {
       window.removeEventListener('consentra_logo_updated', handleLogoUpdated as EventListener);
     };

@@ -13,7 +13,9 @@
  */
 import { Quote, ClientData } from './types';
 import {
-  importQuoteToSupabase,
+  fetchQuotes,
+  fetchNextQuoteNumber,
+  saveQuoteToSupabase,
   insertClientsIfMissing,
   normalizeQuoteId,
   uploadLogoToStorage,
@@ -33,16 +35,6 @@ export const LOCAL_QUOTES_KEY = 'consentra_quotes_data';
 export const LOCAL_CLIENTS_KEY = 'consentra_clients_data';
 const SETTINGS_BACKUP_KEY = 'consentra_local_settings_backup';
 const IMPORT_DONE_KEY = 'consentra_local_import_done';
-const PROGRESS_KEY = 'consentra_local_import_progress_v2';
-
-interface ImportProgress { quotes?: boolean; clients?: boolean; settings?: string[] }
-function readProgress(): ImportProgress {
-  return readJson<ImportProgress>(localStorage.getItem(PROGRESS_KEY)) || {};
-}
-function checkpoint(progress: ImportProgress): void {
-  // Se não for possível guardar o progresso, não anuncia uma conclusão falsa.
-  localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
-}
 
 const SETTINGS_KEYS_TO_BACKUP = [
   COMPANY_PROFILE_STORAGE_KEY,
@@ -104,11 +96,10 @@ export function getPendingLocalData(): PendingLocalData | null {
 
   const quotesRaw = readJson<unknown>(localStorage.getItem(LOCAL_QUOTES_KEY));
   const clientsRaw = readJson<unknown>(localStorage.getItem(LOCAL_CLIENTS_KEY));
-  const progress = readProgress();
-  const quotes = (Array.isArray(quotesRaw) && !progress.quotes ? quotesRaw : []).filter(
+  const quotes = (Array.isArray(quotesRaw) ? quotesRaw : []).filter(
     (q): q is Quote => typeof q === 'object' && q !== null && 'numberOnly' in q && Array.isArray((q as Quote).items)
   );
-  const clients = (Array.isArray(clientsRaw) && !progress.clients ? clientsRaw : []).filter(
+  const clients = (Array.isArray(clientsRaw) ? clientsRaw : []).filter(
     (c): c is ClientData => typeof c === 'object' && c !== null && typeof (c as ClientData).id === 'string' && typeof (c as ClientData).name === 'string'
   );
 
@@ -117,18 +108,17 @@ export function getPendingLocalData(): PendingLocalData | null {
   const settingsLabels: string[] = [];
 
   const profile = readJson<Record<string, unknown>>(backup[COMPANY_PROFILE_STORAGE_KEY]);
-  if (profile && typeof profile === 'object' && !progress.settings?.includes(SETTING_KEYS.companyProfile)) {
+  if (profile && typeof profile === 'object') {
     settings.companyProfile = profile;
     settingsLabels.push('Dados da empresa');
   }
   const texts = readJson<Record<string, unknown>>(backup[QUOTE_TEXTS_STORAGE_KEY]);
-  if (texts && typeof texts === 'object' && !progress.settings?.includes(SETTING_KEYS.quoteTexts)) {
+  if (texts && typeof texts === 'object') {
     settings.quoteTexts = texts;
     settingsLabels.push('Textos padrão do PDF');
   }
   const responsibles = readJson<string[]>(backup[RESPONSIBLES_STORAGE_KEY]);
   if (
-    !progress.settings?.includes(SETTING_KEYS.responsibles) &&
     Array.isArray(responsibles) &&
     responsibles.length > 0 &&
     JSON.stringify(responsibles) !== JSON.stringify(DEFAULT_RESPONSIBLES)
@@ -137,7 +127,7 @@ export function getPendingLocalData(): PendingLocalData | null {
     settingsLabels.push('Lista de responsáveis');
   }
   const logo = backup[LOGO_LOCAL_STORAGE_KEY];
-  if (typeof logo === 'string' && logo.startsWith('data:image/') && !progress.settings?.includes(SETTING_KEYS.logo)) {
+  if (typeof logo === 'string' && logo.startsWith('data:image/')) {
     settings.logoDataUrl = logo;
     settingsLabels.push('Logotipo');
   }
@@ -166,6 +156,14 @@ function dataUrlToFile(dataUrl: string): File | null {
   }
 }
 
+function isSameQuote(a: Quote, b: Quote): boolean {
+  return (
+    (a.clientName || '').trim() === (b.clientName || '').trim() &&
+    Math.abs((Number(a.total) || 0) - (Number(b.total) || 0)) < 0.005 &&
+    (a.issueDate || '') === (b.issueDate || '')
+  );
+}
+
 export interface LocalImportResult {
   quotesImported: number;
   quotesSkipped: number;
@@ -180,18 +178,10 @@ export interface LocalImportResult {
  * - Clientes: inseridos sem sobrescrever os já existentes no servidor.
  * - Orçamentos: se o número já existir no servidor com outro conteúdo, recebem
  *   um novo número da sequência (o mapeamento é informado no resultado).
- *   Recibos no servidor impedem duplicações, mesmo após falha de rede ou nova sessão.
+ *   Orçamentos idênticos já importados são ignorados (é seguro repetir).
  * - Configurações: somente administradores (`includeSettings`).
  */
-// Coalesce cliques simultâneos nesta aba; o RPC também serializa abas concorrentes.
-let activeImport: Promise<LocalImportResult> | null = null;
-export function importLocalData(includeSettings: boolean): Promise<LocalImportResult> {
-  if (activeImport) return activeImport;
-  activeImport = runImport(includeSettings).finally(() => { activeImport = null; });
-  return activeImport;
-}
-
-async function runImport(includeSettings: boolean): Promise<LocalImportResult> {
+export async function importLocalData(includeSettings: boolean): Promise<LocalImportResult> {
   const result: LocalImportResult = {
     quotesImported: 0,
     quotesSkipped: 0,
@@ -202,95 +192,100 @@ async function runImport(includeSettings: boolean): Promise<LocalImportResult> {
   };
   const pending = getPendingLocalData();
   if (!pending) return result;
-  const progress = readProgress();
-  progress.settings ||= [];
-  const completeSetting = (key: string) => {
-    if (!progress.settings!.includes(key)) progress.settings!.push(key);
-    checkpoint(progress);
-  };
 
-  try {
-    // 1. Clientes
-    if (pending.clients.length > 0) {
-      const res = await insertClientsIfMissing(pending.clients);
-      if (res.success) {
-        result.clientsImported = res.data;
-        progress.clients = true;
-        checkpoint(progress);
-      }
-      else result.errors.push(`Clientes: ${res.error}`);
-    }
+  // 1. Clientes
+  if (pending.clients.length > 0) {
+    const res = await insertClientsIfMissing(pending.clients);
+    if (res.success) result.clientsImported = res.data;
+    else result.errors.push(`Clientes: ${res.error}`);
+  }
 
-    // 2. Orçamentos: recibo persistente no servidor, não inferências por valor/data.
-    let quoteErrors = false;
-    for (const original of [...pending.quotes].sort((a, b) => a.numberOnly - b.numberOnly)) {
-      const candidate = { ...original, id: normalizeQuoteId(original.id) || String(original.numberOnly) };
-      const res = await importQuoteToSupabase(candidate);
-      if (!res.success) {
-        quoteErrors = true;
-        result.errors.push(`Orçamento ${candidate.id}: ${res.error}`);
-        continue;
-      }
-      if (res.data.skipped) result.quotesSkipped++;
-      else result.quotesImported++;
-      if (res.data.id !== candidate.id) result.renumbered.push(`${candidate.id} → ${res.data.numberOnly}`);
-    }
-    if (!quoteErrors) {
-      progress.quotes = true;
-      checkpoint(progress);
-    }
+  // 2. Orçamentos
+  if (pending.quotes.length > 0) {
+    const remote = await fetchQuotes();
+    if (!remote.success) {
+      result.errors.push(`Orçamentos: ${remote.error}`);
+    } else {
+      const byId = new Map(remote.data.map((q) => [q.id, q]));
+      const usedNumbers = new Set(remote.data.map((q) => q.numberOnly));
+      const sorted = [...pending.quotes].sort((a, b) => (a.numberOnly || 0) - (b.numberOnly || 0));
 
-    // 3. Configurações (somente administradores — RLS bloqueia os demais)
-    if (includeSettings) {
-      const s = pending.settings;
-      if (s.companyProfile) {
-        const res = await saveAppSetting(SETTING_KEYS.companyProfile, s.companyProfile);
-        if (res.success) {
-          completeSetting(SETTING_KEYS.companyProfile);
-          applyRemoteCompanyProfile(s.companyProfile);
-          result.settingsImported.push('Dados da empresa');
-        } else result.errors.push(`Dados da empresa: ${res.error}`);
-      }
-      if (s.quoteTexts) {
-        const res = await saveAppSetting(SETTING_KEYS.quoteTexts, s.quoteTexts);
-        if (res.success) {
-          completeSetting(SETTING_KEYS.quoteTexts);
-          applyRemoteQuoteTexts(s.quoteTexts);
-          result.settingsImported.push('Textos padrão do PDF');
-        } else result.errors.push(`Textos do PDF: ${res.error}`);
-      }
-      if (s.responsibles) {
-        const res = await saveAppSetting(SETTING_KEYS.responsibles, s.responsibles);
-        if (res.success) {
-          completeSetting(SETTING_KEYS.responsibles);
-          applyRemoteResponsibles(s.responsibles);
-          result.settingsImported.push('Lista de responsáveis');
-        } else result.errors.push(`Responsáveis: ${res.error}`);
-      }
-      if (s.logoDataUrl) {
-        const file = dataUrlToFile(s.logoDataUrl);
-        if (!file) {
-          result.errors.push('Logotipo: arquivo local inválido.');
-        } else {
-          const up = await uploadLogoToStorage(file);
-          if (!up.success) {
-            result.errors.push(`Logotipo: ${up.error}`);
-          } else {
-            const res = await saveAppSetting(SETTING_KEYS.logo, up.data);
-            if (res.success) {
-              completeSetting(SETTING_KEYS.logo);
-              applyRemoteLogo(up.data);
-              result.settingsImported.push('Logotipo');
-            } else result.errors.push(`Logotipo: ${res.error}`);
+      for (const original of sorted) {
+        let candidate: Quote = {
+          ...original,
+          id: normalizeQuoteId(original.id) || String(original.numberOnly),
+          numberOnly: Number(original.numberOnly),
+        };
+        const existing = byId.get(candidate.id);
+        if (existing && isSameQuote(existing, candidate)) {
+          result.quotesSkipped++;
+          continue;
+        }
+        const invalidNumber = !Number.isInteger(candidate.numberOnly) || candidate.numberOnly <= 0;
+        if (existing || invalidNumber || usedNumbers.has(candidate.numberOnly)) {
+          const next = await fetchNextQuoteNumber();
+          if (!next.success) {
+            result.errors.push(`Orçamento ${candidate.id}: ${next.error}`);
+            continue;
           }
+          result.renumbered.push(`${candidate.id} → ${next.data}`);
+          candidate = { ...candidate, id: String(next.data), numberOnly: next.data };
+        }
+        const saved = await saveQuoteToSupabase(candidate);
+        if (saved.success) {
+          result.quotesImported++;
+          byId.set(candidate.id, candidate);
+          usedNumbers.add(candidate.numberOnly);
+        } else {
+          result.errors.push(`Orçamento ${candidate.id}: ${saved.error}`);
         }
       }
     }
-
-    // Uma importação sem privilégios não trata configurações como importadas.
-    if (result.errors.length === 0 && !getPendingLocalData()) markLocalImportDone();
-  } catch (err) {
-    result.errors.push(err instanceof Error ? err.message : 'Não foi possível guardar o progresso da importação.');
   }
+
+  // 3. Configurações (somente administradores — RLS bloqueia os demais)
+  if (includeSettings) {
+    const s = pending.settings;
+    if (s.companyProfile) {
+      const res = await saveAppSetting(SETTING_KEYS.companyProfile, s.companyProfile);
+      if (res.success) {
+        applyRemoteCompanyProfile(s.companyProfile);
+        result.settingsImported.push('Dados da empresa');
+      } else result.errors.push(`Dados da empresa: ${res.error}`);
+    }
+    if (s.quoteTexts) {
+      const res = await saveAppSetting(SETTING_KEYS.quoteTexts, s.quoteTexts);
+      if (res.success) {
+        applyRemoteQuoteTexts(s.quoteTexts);
+        result.settingsImported.push('Textos padrão do PDF');
+      } else result.errors.push(`Textos do PDF: ${res.error}`);
+    }
+    if (s.responsibles) {
+      const res = await saveAppSetting(SETTING_KEYS.responsibles, s.responsibles);
+      if (res.success) {
+        applyRemoteResponsibles(s.responsibles);
+        result.settingsImported.push('Lista de responsáveis');
+      } else result.errors.push(`Responsáveis: ${res.error}`);
+    }
+    if (s.logoDataUrl) {
+      const file = dataUrlToFile(s.logoDataUrl);
+      if (!file) {
+        result.errors.push('Logotipo: arquivo local inválido.');
+      } else {
+        const up = await uploadLogoToStorage(file);
+        if (!up.success) {
+          result.errors.push(`Logotipo: ${up.error}`);
+        } else {
+          const res = await saveAppSetting(SETTING_KEYS.logo, up.data);
+          if (res.success) {
+            applyRemoteLogo(up.data);
+            result.settingsImported.push('Logotipo');
+          } else result.errors.push(`Logotipo: ${res.error}`);
+        }
+      }
+    }
+  }
+
+  if (result.errors.length === 0) markLocalImportDone();
   return result;
 }

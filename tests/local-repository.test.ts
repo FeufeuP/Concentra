@@ -80,8 +80,8 @@ describe('repositório local', () => {
   it('gerencia clientes e catálogo', async () => {
     const storage = new MemoryStorage();
     const repo = createLocalRepository(storage);
-    await repo.saveClient(client, true);
-    await repo.saveClient({ ...client, name: 'Indústria Renomeada' }, false);
+    await repo.saveClient(client);
+    await repo.saveClient({ ...client, name: 'Indústria Renomeada' });
     let clients = JSON.parse(storage.getItem(LOCAL_CLIENTS_KEY) as string);
     expect(clients).toHaveLength(1);
     expect(clients[0].name).toBe('Indústria Renomeada');
@@ -115,18 +115,5 @@ describe('repositório local', () => {
     expect(res.success).toBe(false);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
-  });
-});
-
-
-describe('proteção de cadastro local', () => {
-  it('não sobrescreve em colisão nem recria um cadastro removido durante edição', async () => {
-    const storage = new MemoryStorage();
-    const repo = createLocalRepository(storage);
-    expect((await repo.saveClient(client, true)).success).toBe(true);
-    expect((await repo.saveClient({ ...client, name: 'Outro' }, true)).success).toBe(false);
-    expect(JSON.parse(storage.getItem(LOCAL_CLIENTS_KEY)!)[0].name).toBe(client.name);
-    await repo.deleteClient(client.id);
-    expect((await repo.saveClient(client, false)).success).toBe(false);
   });
 });

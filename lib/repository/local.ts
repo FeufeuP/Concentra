@@ -107,12 +107,8 @@ export function createLocalRepository(
       return ok(list.length);
     },
 
-    async saveClient(client, isNew) {
-      const list = clients();
-      const exists = list.some(c => c.id === client.id);
-      if (isNew && exists) return { success: false, error: 'Já existe um cliente com este identificador.' };
-      if (!isNew && !exists) return { success: false, error: 'O cliente foi removido. Recarregue os dados.' };
-      return write(LOCAL_CLIENTS_KEY, [client, ...list.filter(c => c.id !== client.id)]);
+    async saveClient(client) {
+      return write(LOCAL_CLIENTS_KEY, [client, ...clients().filter(c => c.id !== client.id)]);
     },
 
     async deleteClient(clientId) {
@@ -122,7 +118,13 @@ export function createLocalRepository(
     async saveService(service) {
       const list = catalog();
       const idx = list.findIndex(s => s.id === service.id);
-      return write(LOCAL_CATALOG_KEY, idx >= 0 ? list.map((s, i) => (i === idx ? service : s)) : [service, ...list]);
+      const now = new Date().toISOString();
+      const stamped: CatalogService = {
+        ...service,
+        createdAt: service.createdAt || (idx >= 0 ? list[idx]!.createdAt : now),
+        updatedAt: service.updatedAt || now,
+      };
+      return write(LOCAL_CATALOG_KEY, idx >= 0 ? list.map((s, i) => (i === idx ? stamped : s)) : [stamped, ...list]);
     },
 
     async deleteService(serviceId) {

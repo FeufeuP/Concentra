@@ -72,6 +72,8 @@ interface CatalogRow {
   status: string | null;
   deliverables: string[] | null;
   quick_select: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 interface ClientRow {
@@ -314,37 +316,6 @@ function notConnected<T>(): RemoteResult<T> {
   return { success: false, error: 'Supabase não conectado.' };
 }
 
-/** Todas as páginas, mesmo se o limite do servidor for menor que o solicitado.
- * A ordenação de cada consulta deve terminar numa chave única (evita empates).
- * Qualquer página incompleta/erro invalida a carga inteira: nunca devolve sucesso parcial.
- */
-export async function fetchAllPages<T>(
-  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>
-): Promise<RemoteResult<T[]>> {
-  const rows: T[] = [];
-  let total: number | undefined;
-  for (;;) {
-    const result = await page(rows.length, rows.length + 499);
-    if (result.error) return { success: false, error: friendlyDbError(result.error) };
-    if (result.count != null) {
-      if (total !== undefined && total !== result.count) {
-        return { success: false, error: 'Os dados mudaram durante o carregamento. Recarregue a página.' };
-      }
-      total = result.count;
-    }
-    const batch = result.data || [];
-    rows.push(...batch);
-    if (total !== undefined && rows.length > total) {
-      return { success: false, error: 'O servidor retornou uma página inconsistente. Recarregue a página.' };
-    }
-    if (total !== undefined && rows.length === total) return { success: true, data: rows };
-    if (batch.length === 0) {
-      return total === undefined ? { success: true, data: rows }
-        : { success: false, error: 'Não foi possível carregar todos os registros. Tente novamente.' };
-    }
-  }
-}
-
 // ==============================================================================
 // ORÇAMENTOS (QUOTES) & ITENS
 // ==============================================================================
@@ -355,13 +326,11 @@ export async function fetchQuotes(): Promise<RemoteResult<Quote[]>> {
 
   try {
     const [quotesRes, itemsRes] = await Promise.all([
-      fetchAllPages<QuoteRow>((from, to) => client.from('quotes').select('*', { count: 'exact' })
-        .order('number_only', { ascending: false }).order('id').range(from, to)),
-      fetchAllPages<QuoteItemRow>((from, to) => client.from('quote_items').select('*', { count: 'exact' })
-        .order('quote_id').order('item_number').order('id').range(from, to)),
+      client.from('quotes').select('*').order('number_only', { ascending: false }),
+      client.from('quote_items').select('*').order('item_number', { ascending: true }),
     ]);
-    if (!quotesRes.success) return quotesRes;
-    if (!itemsRes.success) return itemsRes;
+    if (quotesRes.error) return { success: false, error: friendlyDbError(quotesRes.error) };
+    if (itemsRes.error) return { success: false, error: friendlyDbError(itemsRes.error) };
 
     const itemsMap: Record<string, QuoteItem[]> = {};
     for (const item of (itemsRes.data || []) as QuoteItemRow[]) {
@@ -417,30 +386,6 @@ export async function saveQuoteToSupabase(quote: Quote): Promise<{ success: bool
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao salvar orçamento.') };
-  }
-}
-
-export interface ImportedQuote {
-  id: string;
-  numberOnly: number;
-  skipped: boolean;
-}
-
-/** Importação atômica e idempotente; recibo e orçamento são confirmados juntos no servidor. */
-export async function importQuoteToSupabase(quote: Quote): Promise<RemoteResult<ImportedQuote>> {
-  const client = getSupabaseClient();
-  if (!client) return notConnected();
-  try {
-    const { data, error } = await client.rpc('import_quote', {
-      p_quote: quoteToPayload(quote), p_items: itemsToPayload(quote.items),
-    });
-    if (error) return { success: false, error: friendlyDbError(error) };
-    if (!data || typeof data.id !== 'string' || !Number.isInteger(data.numberOnly) || typeof data.skipped !== 'boolean') {
-      return { success: false, error: 'O servidor não confirmou a importação do orçamento.' };
-    }
-    return { success: true, data: data as ImportedQuote };
-  } catch (err) {
-    return { success: false, error: getErrorMessage(err, 'Erro ao importar orçamento.') };
   }
 }
 
@@ -573,10 +518,8 @@ export async function fetchClients(): Promise<RemoteResult<ClientData[]>> {
   if (!client) return notConnected();
 
   try {
-    const result = await fetchAllPages<ClientRow>((from, to) => client.from('clients').select('*', { count: 'exact' })
-      .order('name').order('id').range(from, to));
-    if (!result.success) return result;
-    const data = result.data;
+    const { data, error } = await client.from('clients').select('*').order('name', { ascending: true });
+    if (error) return { success: false, error: friendlyDbError(error) };
 
     return {
       success: true,
@@ -615,16 +558,17 @@ function clientToPayload(c: ClientData) {
   };
 }
 
-export async function saveClientToSupabase(c: ClientData, isNew: boolean): Promise<{ success: boolean; error?: string }> {
+export async function saveClientToSupabase(c: ClientData): Promise<{ success: boolean; error?: string }> {
   const client = getSupabaseClient();
   if (!client) return { success: false, error: 'Supabase não conectado.' };
 
   try {
-    const table = client.from('clients');
-    const query = isNew ? table.insert(clientToPayload(c)) : table.update(clientToPayload(c)).eq('id', c.id);
-    const { data, error } = await query.select('id');
+    // Confirmação de gravação (mesma regra do catálogo): 0 linhas = não salvou.
+    const { data, error } = await client.from('clients').upsert(clientToPayload(c), { onConflict: 'id' }).select('id');
     if (error) return { success: false, error: friendlyDbError(error) };
-    if (!data?.length) return { success: false, error: 'O cliente não foi salvo (sem permissão ou cadastro removido).' };
+    if (!data || data.length === 0) {
+      return { success: false, error: 'O cliente não foi gravado no servidor (sem permissão para o seu perfil).' };
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao salvar cliente.') };
@@ -682,6 +626,26 @@ function rowToCatalog(r: CatalogRow): CatalogService {
     status: r.status === 'Inativo' ? 'Inativo' : 'Ativo',
     deliverables: r.deliverables || [],
     quickSelect: Boolean(r.quick_select),
+    createdAt: r.created_at || undefined,
+    updatedAt: r.updated_at || undefined,
+  };
+}
+
+/** Serviço do app → linha do banco (snake_case). */
+export function catalogToPayload(s: CatalogService) {
+  return {
+    id: s.id,
+    code: s.code || null,
+    title: s.title,
+    subtitle: s.subtitle || null,
+    description: s.description || '',
+    unit: s.unit || 'Unidade',
+    suggested_price: Number(s.suggestedPrice) || 0,
+    nr_category: s.nrCategory || '',
+    category: s.category || null,
+    status: s.status || 'Ativo',
+    deliverables: s.deliverables || [],
+    quick_select: Boolean(s.quickSelect),
   };
 }
 
@@ -689,10 +653,8 @@ export async function fetchCatalog(): Promise<RemoteResult<CatalogService[]>> {
   const client = getSupabaseClient();
   if (!client) return notConnected();
   try {
-    const result = await fetchAllPages<CatalogRow>((from, to) => client.from('catalog_services').select('*', { count: 'exact' })
-      .order('code').order('id').range(from, to));
-    if (!result.success) return result;
-    const data = result.data;
+    const { data, error } = await client.from('catalog_services').select('*').order('code', { ascending: true });
+    if (error) return { success: false, error: friendlyDbError(error) };
     return { success: true, data: ((data || []) as CatalogRow[]).map(rowToCatalog) };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao carregar o catálogo.') };
@@ -703,24 +665,17 @@ export async function saveCatalogService(s: CatalogService): Promise<{ success: 
   const client = getSupabaseClient();
   if (!client) return { success: false, error: 'Supabase não conectado.' };
   try {
-    const { error } = await client.from('catalog_services').upsert(
-      {
-        id: s.id,
-        code: s.code || null,
-        title: s.title,
-        subtitle: s.subtitle || null,
-        description: s.description || '',
-        unit: s.unit || 'Unidade',
-        suggested_price: Number(s.suggestedPrice) || 0,
-        nr_category: s.nrCategory || '',
-        category: s.category || null,
-        status: s.status || 'Ativo',
-        deliverables: s.deliverables || [],
-        quick_select: Boolean(s.quickSelect),
-      },
-      { onConflict: 'id' }
-    );
+    // `.select('id')` é a confirmação de gravação: sem ele, um upsert barrado
+    // silenciosamente pelo RLS (0 linhas) era tratado como sucesso e o serviço
+    // "salvava" na tela, mas não existia no banco ao recarregar.
+    const { data, error } = await client
+      .from('catalog_services')
+      .upsert(catalogToPayload(s), { onConflict: 'id' })
+      .select('id');
     if (error) return { success: false, error: friendlyDbError(error) };
+    if (!data || data.length === 0) {
+      return { success: false, error: 'O serviço não foi gravado no servidor (sem permissão para o seu perfil).' };
+    }
     return { success: true };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao salvar serviço.') };
@@ -750,10 +705,8 @@ export async function fetchAppSettings(): Promise<RemoteResult<Record<string, un
   const client = getSupabaseClient();
   if (!client) return notConnected();
   try {
-    const result = await fetchAllPages<{ key: string; value: unknown }>((from, to) => client.from('app_settings')
-      .select('key, value', { count: 'exact' }).order('key').range(from, to));
-    if (!result.success) return result;
-    const data = result.data;
+    const { data, error } = await client.from('app_settings').select('key, value');
+    if (error) return { success: false, error: friendlyDbError(error) };
     const map: Record<string, unknown> = {};
     for (const row of (data || []) as { key: string; value: unknown }[]) map[row.key] = row.value;
     return { success: true, data: map };
@@ -768,14 +721,8 @@ export async function saveAppSetting(key: string, value: unknown): Promise<{ suc
   if (!client) return { success: false, error: 'Supabase não conectado.' };
   try {
     if (value === null || value === undefined) {
-      const { data, error } = await client.from('app_settings').delete().eq('key', key).select('key');
+      const { error } = await client.from('app_settings').delete().eq('key', key);
       if (error) return { success: false, error: friendlyDbError(error) };
-      if (!data?.length) {
-        // DELETE bloqueado por RLS pode afetar zero linhas sem retornar erro.
-        const remaining = await client.from('app_settings').select('key').eq('key', key);
-        if (remaining.error) return { success: false, error: friendlyDbError(remaining.error) };
-        if (remaining.data?.length) return { success: false, error: 'Seu perfil não tem permissão para restaurar esta configuração.' };
-      }
       return { success: true };
     }
     const { data, error } = await client
@@ -802,7 +749,7 @@ export async function uploadLogoToStorage(file: File): Promise<RemoteResult<stri
   if (!ext) return { success: false, error: 'Formato não suportado. Use PNG, JPG ou WebP.' };
   if (file.size > MAX_LOGO_BYTES) return { success: false, error: 'Arquivo muito grande (máximo 2 MB).' };
   try {
-    const path = `logo/logo-${crypto.randomUUID()}.${ext}`;
+    const path = `logo/logo-${Date.now()}.${ext}`;
     const { error } = await client.storage.from(LOGO_BUCKET).upload(path, file, {
       cacheControl: '31536000',
       contentType: file.type,
@@ -811,8 +758,11 @@ export async function uploadLogoToStorage(file: File): Promise<RemoteResult<stri
     if (error) return { success: false, error: friendlyDbError(error) };
     const { data } = client.storage.from(LOGO_BUCKET).getPublicUrl(path);
 
-    // Não apaga logos anteriores: podem estar referenciados por configurações
-    // ou propostas, inclusive se o salvamento da nova URL falhar.
+    // Remove versões anteriores (melhor esforço)
+    const { data: files } = await client.storage.from(LOGO_BUCKET).list('logo', { limit: 100 });
+    const old = (files || []).map((f) => `logo/${f.name}`).filter((p) => p !== path);
+    if (old.length > 0) await client.storage.from(LOGO_BUCKET).remove(old);
+
     return { success: true, data: data.publicUrl };
   } catch (err) {
     return { success: false, error: getErrorMessage(err, 'Erro ao enviar o logotipo.') };

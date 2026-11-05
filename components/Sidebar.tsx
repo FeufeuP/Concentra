@@ -196,9 +196,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   onClick={onLogout}
                   title="Sair do Sistema"
-                  className="p-1.5 rounded-lg text-[#64748b] hover:text-[#ba1a1a] hover:bg-red-50 transition-colors shrink-0"
+                  aria-label="Sair do Sistema"
+                  className="px-2 py-1.5 rounded-lg text-[#64748b] hover:text-[#ba1a1a] hover:bg-red-50 transition-colors shrink-0 flex items-center gap-1"
                 >
                   <span className="material-symbols-outlined text-[18px]">logout</span>
+                  <span className="text-[11px] font-semibold">Sair</span>
                 </button>
               )}
             </div>
