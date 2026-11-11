@@ -1,0 +1,2 @@
+# partes binárias do Consentra.exe (não aplicar conversão de fim de linha)
+/releases/*.part-* -text
