@@ -35,3 +35,15 @@ Thumbs.db
 
 # deploy
 .vercel
+
+# artefatos do app desktop local (.exe/.zip + área de montagem)
+/dist/
+/scripts/desktop/.staging/
+/scripts/desktop/.cache/
+/.desktop-build/
+
+/scripts/desktop/embedded-assets.cjs
+
+# binário do app desktop, copiado na raiz do repo
+/Consentra.exe
+/Consentra-Portable-*.zip

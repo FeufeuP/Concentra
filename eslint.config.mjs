@@ -14,5 +14,25 @@ export default defineConfig([
       ],
     },
   },
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'node_modules/**', 'next-env.d.ts', 'supabase/functions/**']),
+  {
+    // Scripts Node do empacotamento desktop são CommonJS por design (runtime
+    // do app empacotado e build local), não módulos ES do Next.js.
+    files: ['scripts/desktop/**/*.js', 'scripts/desktop/**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'node_modules/**',
+    'next-env.d.ts',
+    'supabase/functions/**',
+    '.desktop-build/**',
+    'dist/**',
+    'scripts/desktop/.staging/**',
+    'scripts/desktop/.cache/**',
+    'scripts/desktop/embedded-assets.cjs',
+  ]),
 ]);
