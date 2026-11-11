@@ -28,7 +28,15 @@ const nextConfig: NextConfig = {
   ...(basePath ? { basePath } : {}),
   /* O export estático não tem otimizador de imagens do servidor. */
   images: { unoptimized: true },
-  ...(isStaticExport ? ({ output: 'export', trailingSlash: true } as const) : {}),
+  ...(isStaticExport
+    ? ({
+        output: 'export',
+        trailingSlash: true,
+        /* O export estático (Pages/desktop) valida tipos só do código do app;
+           tests/ tem erros pré-existentes no branch base. */
+        typescript: { tsconfigPath: 'tsconfig.build.json' },
+      } as const)
+    : {}),
   ...(allowedDevOrigins.length > 0 ? { allowedDevOrigins } : {}),
 };
 

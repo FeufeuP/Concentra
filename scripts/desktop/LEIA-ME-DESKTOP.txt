@@ -1,0 +1,79 @@
+Consentra — Gestão de SST · Aplicativo para Windows
+=====================================================
+
+O que é
+-------
+O aplicativo do Consentra, o sistema de emissão de orçamentos e gestão de
+Saúde e Segurança do Trabalho (SST): pipeline comercial, clientes,
+catálogo de serviços (NRs, laudos, treinamentos, eSocial), relatórios e PDF.
+
+O "Consentra.exe" é um app autocontido para Windows 64 bits: o site inteiro
+vai dentro dele (Node.js SEA — Single Executable Application). Ao ser
+executado, ele inicia um servidor LOCAL na sua máquina e abre o Consentra
+no navegador padrão, em http://127.0.0.1:3217
+(se a porta estiver ocupada, usa automaticamente a próxima livre).
+Nenhum dado sai do seu computador, a menos que você configure o Supabase
+(conforme o README do projeto) ou envie e-mails/WhatsApp pelo próprio app.
+
+Há dois pacotes:
+  A) Consentra.exe                    — o aplicativo, um único arquivo
+  B) Consentra-Portable-<versão>.zip  — o mesmo .exe + "consentra.vbs"
+     (atalho que abre o app sem mostrar a janela do console)
+
+Requisitos: Windows 10 ou superior (64 bits) e um navegador moderno.
+
+Como abrir
+----------
+- Duplo clique em "Consentra.exe" (uma janela de console mostra
+  "http://127.0.0.1:3217" enquanto o app estiver rodando — fechar a janela
+  encerra o app), ou
+- duplo clique em "consentra.vbs" (abre direto no navegador, sem console).
+- Se o navegador não abrir: acesse manualmente http://127.0.0.1:3217
+
+Como encerrar
+-------------
+- Feche a janela do console do Consentra.exe, ou
+- Gerenciador de Tarefas → tarefa "Consentra.exe" → Encerrar tarefa, ou
+- Prompt de Comando:  taskkill /F /IM Consentra.exe
+
+Modo local x Supabase
+---------------------
+Sem configuração, o Consentra roda em MODO LOCAL: os dados ficam salvos no
+navegador (localStorage), válidos apenas neste computador e neste navegador,
+por origem (http://127.0.0.1:3217). No modo local, o login é apenas
+demonstrativo — não use dados reais sem configurar o Supabase.
+
+Para usar o Supabase (banco de dados e login reais), o pacote precisa ser
+gerado com NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY
+definidas no momento do build (veja o README.md do projeto).
+
+Como atualizar
+--------------
+Baixe a nova versão e substitua o Consentra.exe. Seus dados (modo local,
+salvos no navegador) são preservados.
+
+Como desinstalar
+----------------
+Apague o Consentra.exe (e a pasta onde ele estiver). Os dados do modo
+local ficam no navegador e NÃO são apagados; para removê-los, limpe os
+dados do site http://127.0.0.1:3217 no navegador.
+
+Aviso do Windows (SmartScreen)
+------------------------------
+O executável não é assinado digitalmente. Na primeira execução, o Windows
+pode mostrar "O Windows protegeu o seu PC": clique em "Mais informações" →
+"Executar assim mesmo". Isso é esperado para apps sem certificado de
+assinatura de código. Confira o SHA256 no arquivo SHA256SUMS.txt
+distribuído junto com o app. Internamente, o Consentra.exe é um Node.js
+(open-source, licença MIT) com o site embutido; por isso o gerenciador de
+tarefas pode descrevê-lo como Node.js.
+
+Solução de problemas
+--------------------
+- O navegador não abriu: acesse http://127.0.0.1:3217 manualmente.
+- Página em branco ou erro: verifique se não há outra versão do Consentra
+  ocupando a porta; normalmente o app tenta a próxima porta livre — olhe
+  o log abaixo para descobrir qual foi usada.
+- Log do servidor (diagnóstico): pasta TEMP do Windows
+  (ex.: C:\Users\<você>\AppData\Local\Temp), arquivo "consentra-desktop.log".
+- "O Windows protegeu o seu PC": veja a seção SmartScreen acima.

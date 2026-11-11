@@ -142,6 +142,45 @@ O app é servido em uma subpasta (`/Concentra`), então o build do Pages define
 > Para testar localmente o resultado do Pages: `npm run build:pages` e depois sirva a pasta `out/`
 > (ex.: `npx serve out`). Em qualquer outro deploy, use `npm run build`.
 
+## App desktop (.exe para Windows)
+
+O projeto pode ser empacotado como um **app autocontido para Windows 64 bits**: `Consentra.exe`
+inicia um servidor local (somente `127.0.0.1`) com o site inteiro embutido e abre o sistema no
+navegador padrão, em `http://127.0.0.1:3217`. Sem dependências externas no computador do usuário.
+
+Os scripts ficam em [`scripts/desktop/`](./scripts/desktop/):
+
+| Comando | Descrição |
+|---|---|
+| `npm run build:desktop` | Gera `dist/Consentra.exe`, `dist/Consentra-Portable-<versão>.zip` e `dist/SHA256SUMS.txt` |
+
+Como funciona (Node.js [SEA](https://nodejs.org/api/single-executable-applications.html) + `postject`):
+
+1. `GITHUB_PAGES=true npm run build` gera o site estático em `out/`;
+2. `scripts/desktop/build-sea.cjs` embute `out/` num mapa `embedded-assets.cjs` e faz o bundle do
+   servidor local ([`scripts/desktop/server.js`](./scripts/desktop/server.js)) com esbuild;
+3. o [Node.js oficial win_amd64](https://pypi.org/project/nodejs-wheel-binaries/) recebe o blob SEA
+   injetado via `postject`. Nenhum binário é versionado no repositório — o runtime (~40 MB) é
+   baixado sob demanda do PyPI e o instalador/NSIS (opcional) fica em `scripts/desktop/consentra.nsi`
+   para quem tem o NSIS instalado no Windows.
+
+```bash
+# gera os artefatos em dist/ (Linux, com bash + curl + python3 + zip)
+npm run build:desktop
+
+# outra versão
+CONSENTRA_VERSION=2.5.0 npm run build:desktop
+```
+
+Observações:
+
+- O executável **não é assinado** — o SmartScreen do Windows exibe "O Windows protegeu o seu PC"
+  (clique em *Mais informações → Executar assim mesmo*). Confira o SHA256 em `dist/SHA256SUMS.txt`.
+- Sem Supabase embutido (variáveis `NEXT_PUBLIC_*` são inline no build), o app abre em **modo local**.
+- O gerenciador de tarefas pode descrever o processo como Node.js — é o runtime oficial com o site
+  embutido. Encerrar: feche a janela do console, ou `taskkill /F /IM Consentra.exe`.
+- Os artefatos em `dist/` **não são versionados** no git.
+
 ## Publicar na Vercel (produção — `consentra-sst.vercel.app`)
 
 > ⚠️ **Se o endereço da Vercel mostrar uma versão antiga** (ex.: login com “Lembrar meu acesso” /

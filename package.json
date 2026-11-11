@@ -15,7 +15,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:desktop": "bash scripts/desktop/build-desktop.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

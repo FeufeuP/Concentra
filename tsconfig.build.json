@@ -1,0 +1,11 @@
+{
+  /*
+   * tsconfig usado apenas pelo build de artefato (export estático: GitHub Pages
+   * e empacotamento desktop). O código do app (app/, components/, lib/) passa
+   * limpo no tsc; a pasta tests/ está com erros pré-existentes no branch base
+   * (testes antigos que não compilam), por isso fica de fora aqui.
+   * O `npm run typecheck` normal continua usando o tsconfig.json completo.
+   */
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "supabase/functions", "tests", "playwright.config.ts"]
+}
