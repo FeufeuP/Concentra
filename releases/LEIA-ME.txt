@@ -1,0 +1,45 @@
+Consentra.exe — app desktop para Windows (64 bits)
+==================================================
+
+O executável tem ~103 MB, acima do limite de 100 MiB por arquivo do GitHub.
+Por isso ele está dividido em 3 partes binárias nesta pasta.
+
+Arquivos
+--------
+- Consentra.exe.part-00 (40 MB)
+- Consentra.exe.part-01 (40 MB)
+- Consentra.exe.part-02 (24 MB)
+- LEIA-ME.txt (este arquivo)
+
+Verificado com SHA256:
+    74f82ae0288eb35dc29af4b6a0e0632afc43e990dc257d55b929b3ca3469a911  Consentra.exe
+
+Como remontar o Consentra.exe
+-----------------------------
+Windows (Prompt de Comando, dentro desta pasta):
+    copy /b Consentra.exe.part-00+Consentra.exe.part-01+Consentra.exe.part-02 Consentra.exe
+
+Linux / macOS (terminal, dentro desta pasta):
+    cat Consentra.exe.part-00 Consentra.exe.part-01 Consentra.exe.part-02 > Consentra.exe
+
+Confira o hash depois de remontar:
+    Windows: certutil -hashfile Consentra.exe SHA256
+    Linux:   sha256sum Consentra.exe
+
+Deve bater com o valor acima.
+
+Uso
+---
+O Consentra.exe é um app autocontido: duplo clique inicia o sistema no
+navegador padrão, em http://127.0.0.1:3217 (se a porta estiver ocupada, usa
+a próxima livre). Requisitos: Windows 10+ 64 bits e um navegador moderno.
+Sem Supabase embutido no build, ele abre em MODO LOCAL (dados no
+navegador). Na primeira execução, o SmartScreen do Windows pode exibir
+"O Windows protegeu o seu PC": Mais informações → Executar assim mesmo.
+Para sair: feche a janela do console, ou  taskkill /F /IM Consentra.exe
+
+Como foi gerado
+---------------
+Ver README.md → "App desktop (.exe para Windows)" e `npm run build:desktop`
+(scripts em ../scripts/desktop/). Estes binários não são reconstruídos no
+CI — são um artefato de release publicado no repositório.
